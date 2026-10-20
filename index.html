@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2b3a67">
+<title>Portfel</title>
+<style>
+:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318}
+@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(68px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
+h1{font-size:20px;margin:0}
+.st{font-size:12px;color:var(--mu);padding:0 16px 8px;max-width:720px;margin:0 auto}
+main{max-width:720px;margin:0 auto;padding:8px 16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
+.big{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.mu{color:var(--mu);font-size:14px}.bad{color:var(--bad)}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid var(--bd)}
+.row:first-child{border-top:0}
+.row b{font-variant-numeric:tabular-nums;text-align:right}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--ac);color:var(--card);border:0;border-radius:8px;padding:10px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ac);border:1px solid var(--bd)}
+button.danger{background:transparent;color:var(--bad);border:1px solid var(--bd)}
+input,select{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px;margin:4px 0 10px}
+label{font-size:13px;color:var(--mu)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{width:100%;text-align:left;background:transparent;color:var(--tx);border-radius:0;padding:10px 0;border-top:1px solid var(--bd);display:flex;justify-content:space-between;gap:10px}
+.item:first-child{border-top:0}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:transparent;color:var(--mu);border-radius:0;padding:14px 2px;font-size:13px}
+nav button.on{color:var(--ac);font-weight:700;box-shadow:inset 0 2px 0 var(--ac)}
+.login{max-width:360px;margin:12vh auto;padding:0 16px}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,onSnapshot,setDoc} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyBSJNAmWuu4SGu1D25rkJrrn6L0CzOmKds",
+  authDomain:"portfel-7c77f.firebaseapp.com",
+  projectId:"portfel-7c77f",
+  storageBucket:"portfel-7c77f.firebasestorage.app",
+  messagingSenderId:"954590394780",
+  appId:"1:954590394780:web:0b635ea8a6bf48409bf059"
+};
+const CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmNNUaIptQmyWUjvLpJf6oeRlft0DVEbXqoXA0CzfowQizt9uNzR4WFDZT1qW0YCuG9-6RLune9e1C/pub?gid=0&single=true&output=csv";
+const EMAIL="portfel.app@portfel.pl";
+const OWNERS=["Kuba","Żona","Wspólne"];
+
+const auth=getAuth(initializeApp(firebaseConfig));
+const db=getFirestore(auth.app);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num=s=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:NaN};
+const money=(v,c)=>{try{return new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){return v.toFixed(2)+" "+c}};
+
+let user=null,S={accounts:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
+
+function parseCsv(t){const rows=[];let r=[],f="",q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c=='"')q=true;
+    else if(c==","){r.push(f);f=""}
+    else if(c=="\n"||c=="\r"){if(c=="\r"&&t[i+1]=="\n")i++;r.push(f);rows.push(r);r=[];f=""}
+    else f+=c}
+  if(f||r.length){r.push(f);rows.push(r)}return rows}
+
+function applyRows(rows){rates={PLN:1};quotes={};
+  for(const [s,k,w] of rows){if(!s)continue;
+    const m=s.match(/^CURRENCY:([A-Z]{3})PLN$/);
+    if(m){const n=num(k);if(n>0)rates[m[1]]=n}
+    else quotes[s]={price:num(k),fx:num(w)}}}
+
+async function loadRates(){
+  try{const res=await fetch(CSV_URL,{cache:"no-store"});if(!res.ok)throw new Error("http");
+    const rows=parseCsv(await res.text()).slice(1);applyRows(rows);
+    localStorage.setItem("rows",JSON.stringify({t:Date.now(),rows}));
+    info="Kursy pobrane: "+new Date().toLocaleString("pl-PL")}
+  catch(e){try{const c=JSON.parse(localStorage.getItem("rows"));applyRows(c.rows);
+      info="Nie udało się pobrać kursów, pokazuję zapisane z "+new Date(c.t).toLocaleString("pl-PL")}
+    catch(_){info="Brak kursów: nie udało się pobrać arkusza"}}
+  render()}
+
+async function save(){
+  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts});err=""}
+  catch(e){err="Nie zapisano: "+e.code}
+  render()}
+
+function totals(){let t=0;const by={},miss=new Set();
+  OWNERS.forEach(o=>by[o]=0);
+  for(const a of S.accounts){const r=rates[a.cur];
+    if(!r){miss.add(a.cur);continue}
+    const v=a.amount*r;t+=v;by[a.owner]=(by[a.owner]||0)+v}
+  return{t,by,miss:[...miss]}}
+
+function warn(tt){return tt.miss.length?`<p class="bad">Brak kursu do PLN dla: ${tt.miss.map(esc).join(", ")}. Te konta nie są wliczone. Dodaj w arkuszu wiersz CURRENCY:${esc(tt.miss[0])}PLN.</p>`:""}
+
+function viewAll(){const tt=totals();
+  return `<div class="card"><div class="mu">Razem</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div>
+  <div class="card"><div class="mu">Kto ma</div>${OWNERS.map(o=>`<div class="row"><span>${o}</span><b>${money(tt.by[o]||0,"PLN")}</b></div>`).join("")}</div>
+  <div class="card"><div class="mu">Działy</div>
+   <div class="row"><span>Oszczędności i konta</span><b>${money(tt.t,"PLN")}</b></div>
+   <div class="row"><span>Akcje</span><b class="mu">wkrótce</b></div>
+   <div class="row"><span>Obligacje</span><b class="mu">wkrótce</b></div>
+   <div class="row"><span>PPK</span><b class="mu">wkrótce</b></div></div>`}
+
+function viewSav(){const tt=totals();
+  const a=S.accounts.find(x=>x.id===editId)||{name:"",owner:OWNERS[0],cur:"PLN",amount:""};
+  const list=S.accounts.length?S.accounts.map(x=>{const r=rates[x.cur];
+    return `<button class="item" data-edit="${esc(x.id)}"><span>${esc(x.name)}<br><span class="mu">${esc(x.owner)}</span></span><span style="text-align:right"><b>${money(x.amount,x.cur)}</b>${x.cur!=="PLN"&&r?`<br><span class="mu">≈ ${money(x.amount*r,"PLN")}</span>`:""}</span></button>`}).join(""):`<p class="mu">Nie ma jeszcze żadnych kont. Dodaj pierwsze poniżej.</p>`;
+  return `<div class="card"><div class="mu">Suma w PLN</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div>
+  <div class="card">${list}</div>
+  <div class="card"><b>${editId?"Edytuj konto":"Dodaj konto"}</b>
+   <label>Nazwa (np. Revolut, ING oszczędnościowe)</label><input id="f-name" value="${esc(a.name)}">
+   <div class="g2"><div><label>Właściciel</label><select id="f-owner">${OWNERS.map(o=>`<option${o===a.owner?" selected":""}>${o}</option>`).join("")}</select></div>
+   <div><label>Waluta</label><input id="f-cur" list="curs" value="${esc(a.cur)}" maxlength="3"><datalist id="curs"><option>PLN<option>EUR<option>USD<option>GBP<option>CHF<option>CZK</datalist></div></div>
+   <label>Saldo</label><input id="f-amount" inputmode="decimal" value="${a.amount===""?"":String(a.amount).replace(".",",")}">
+   <div class="g2"><button data-save>Zapisz konto</button>${editId?`<button class="ghost" data-cancel>Anuluj</button>`:"<span></span>"}</div>
+   ${editId?`<p><button class="danger" data-del>Usuń to konto</button></p>`:""}</div>`}
+
+function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
+
+function render(){const app=$("#app");
+  if(!booted){app.innerHTML=`<p class="mu" style="padding:24px">Ładowanie…</p>`;return}
+  if(!user){app.innerHTML=`<form class="login" id="lf"><h1>Portfel</h1><p class="mu">Zaloguj się wspólnym kontem aplikacji.</p>
+    <label>E-mail</label><input id="l-mail" type="email" value="${EMAIL}" autocomplete="username">
+    <label>Hasło</label><input id="l-pass" type="password" autocomplete="current-password">
+    ${loginErr?`<p class="bad">${esc(loginErr)}</p>`:""}<button type="submit" style="width:100%">Zaloguj</button></form>`;return}
+  const body=tab==="all"?viewAll():tab==="sav"?viewSav():viewSoon({stk:"Akcje",bnd:"Obligacje",ppk:"PPK"}[tab]);
+  const tabs=[["all","Wszystko"],["sav","Konta"],["stk","Akcje"],["bnd","Obligacje"],["ppk","PPK"]];
+  app.innerHTML=`<header><h1>Portfel</h1><button class="ghost" data-out>Wyloguj</button></header>
+   <div class="st">${esc(info)}${err?` <span class="bad">${esc(err)}</span>`:""}</div><main>${body}</main>
+   <nav>${tabs.map(([k,n])=>`<button data-tab="${k}" class="${k===tab?"on":""}">${n}</button>`).join("")}</nav>`}
+
+document.addEventListener("submit",async e=>{
+  if(e.target.id!=="lf")return;e.preventDefault();loginErr="";
+  try{await signInWithEmailAndPassword(auth,$("#l-mail").value.trim(),$("#l-pass").value)}
+  catch(x){loginErr=["auth/invalid-credential","auth/wrong-password","auth/user-not-found"].includes(x.code)?"Błędny e-mail lub hasło.":"Nie udało się zalogować ("+x.code+").";render()}});
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tab],[data-edit],[data-save],[data-cancel],[data-del],[data-out]");if(!t)return;
+  if(t.dataset.tab){tab=t.dataset.tab;editId=null;render()}
+  else if(t.dataset.edit){editId=t.dataset.edit;render();scrollTo(0,document.body.scrollHeight)}
+  else if("cancel" in t.dataset){editId=null;render()}
+  else if("out" in t.dataset){signOut(auth)}
+  else if("del" in t.dataset){if(confirm("Usunąć to konto z listy?")){S.accounts=S.accounts.filter(x=>x.id!==editId);editId=null;save()}}
+  else if("save" in t.dataset){
+    const name=$("#f-name").value.trim(),cur=$("#f-cur").value.trim().toUpperCase(),amount=num($("#f-amount").value);
+    if(!name||cur.length!==3||isNaN(amount)){alert("Uzupełnij nazwę, trzyliterową walutę (np. PLN) i saldo.");return}
+    const rec={id:editId||String(Date.now()),name,owner:$("#f-owner").value,cur,amount};
+    S.accounts=editId?S.accounts.map(x=>x.id===editId?rec:x):[...S.accounts,rec];editId=null;save()}});
+
+onAuthStateChanged(auth,u=>{user=u;booted=true;
+  if(unsub){unsub();unsub=null}
+  if(u){
+    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];err="";render()},
+      e=>{err="Brak dostępu do bazy: "+e.code;render()});
+    loadRates()}
+  render()});
+render();
+</script>
+</body>
+</html>
