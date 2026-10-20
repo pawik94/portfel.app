@@ -62,7 +62,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 const num=s=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:NaN};
 const money=(v,c)=>{try{return new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){return v.toFixed(2)+" "+c}};
 
-let user=null,S={accounts:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
+let user=null,S={accounts:[],pf:[],tx:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
 
 function parseCsv(t){const rows=[];let r=[],f="",q=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -90,7 +90,7 @@ async function loadRates(){
   render()}
 
 async function save(){
-  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts});err=""}
+  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx});err=""}
   catch(e){err="Nie zapisano: "+e.code}
   render()}
 
@@ -103,12 +103,12 @@ function totals(){let t=0;const by={},miss=new Set();
 
 function warn(tt){return tt.miss.length?`<p class="bad">Brak kursu do PLN dla: ${tt.miss.map(esc).join(", ")}. Te konta nie są wliczone. Dodaj w arkuszu wiersz CURRENCY:${esc(tt.miss[0])}PLN.</p>`:""}
 
-function viewAll(){const tt=totals();
+function viewAll(){const tt=totals(),sk=stkTotals(),sv=tt.t;tt.t+=sk.pln;OWNERS.forEach(o=>tt.by[o]=(tt.by[o]||0)+(sk.by[o]||0));tt.miss=[...new Set([...tt.miss,...sk.miss])];
   return `<div class="card"><div class="mu">Razem</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div>
   <div class="card"><div class="mu">Kto ma</div>${OWNERS.map(o=>`<div class="row"><span>${o}</span><b>${money(tt.by[o]||0,"PLN")}</b></div>`).join("")}</div>
   <div class="card"><div class="mu">Działy</div>
-   <div class="row"><span>Oszczędności i konta</span><b>${money(tt.t,"PLN")}</b></div>
-   <div class="row"><span>Akcje</span><b class="mu">wkrótce</b></div>
+   <div class="row"><span>Oszczędności i konta</span><b>${money(sv,"PLN")}</b></div>
+   <div class="row"><span>Akcje</span><b>${money(sk.pln,"PLN")}</b></div>
    <div class="row"><span>Obligacje</span><b class="mu">wkrótce</b></div>
    <div class="row"><span>PPK</span><b class="mu">wkrótce</b></div></div>`}
 
@@ -126,6 +126,101 @@ function viewSav(){const tt=totals();
    <div class="g2"><button data-save>Zapisz konto</button>${editId?`<button class="ghost" data-cancel>Anuluj</button>`:"<span></span>"}</div>
    ${editId?`<p><button class="danger" data-del>Usuń to konto</button></p>`:""}</div>`}
 
+const CURS=["PLN","EUR","USD","GBP","CHF","CZK","SEK","NOK","DKK","HUF","CAD","AUD","JPY"];
+let pid="all",txEdit=null;
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const pct=v=>isFinite(v)?(v>=0?"+":"")+(v*100).toFixed(2).replace(".",",")+" %":"–";
+const sg=(v,c)=>`<span class="${v<0?"bad":""}">${v>0?"+":""}${money(v,c)}</span>`;
+const fq=n=>String(Math.round(n*1e6)/1e6).replace(".",",");
+const TL={buy:"Zakup",sell:"Sprzedaż",div:"Dywidenda",fee:"Opłata"};
+
+function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0;
+  const txs=S.tx.filter(t=>t.pid===p.id).sort((a,b)=>a.date===b.date?(a.id<b.id?-1:1):(a.date<b.date?-1:1));
+  for(const t of txs){
+    if(!t.sym){fees+=t.amount||0;continue}
+    const P=pos[t.sym]||(pos[t.sym]={sym:t.sym,qty:0,cost:0});
+    if(t.type==="buy"){const c=t.qty*t.price+(t.fee||0);P.qty+=t.qty;P.cost+=c;buys+=c}
+    else if(t.type==="sell"){const avg=P.qty>0?P.cost/P.qty:0;realized+=t.qty*t.price-(t.fee||0)-t.qty*avg;P.cost-=t.qty*avg;P.qty-=t.qty}
+    else if(t.type==="div")divs+=t.amount||0;
+    else if(t.type==="fee")fees+=t.amount||0}
+  const open=[],miss=[],neg=[];let value=0,unreal=0;
+  for(const P of Object.values(pos)){if(Math.abs(P.qty)<1e-9)continue;
+    if(P.qty<0)neg.push(P.sym);
+    const q=quotes[P.sym],pr=q&&q.price>0?q.price:NaN;P.avg=P.qty?P.cost/P.qty:0;P.price=pr;
+    if(isNaN(pr))miss.push(P.sym);else{P.value=P.qty*pr;P.gain=P.value-P.cost;value+=P.value;unreal+=P.gain}
+    open.push(P)}
+  const gain=unreal+realized+divs-fees;
+  const f=rates[p.cur]||open.map(x=>quotes[x.sym]&&quotes[x.sym].fx).find(v=>v>0);
+  return{open,miss,neg,value,unreal,realized,divs,fees,gain,buys,ret:buys>0?gain/buys:NaN,f}}
+
+function stkTotals(){let pln=0;const by={},miss=new Set();
+  for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
+    pln+=c.value*c.f;by[p.owner]=(by[p.owner]||0)+c.value*c.f}
+  return{pln,by,miss:[...miss]}}
+
+function stkAll(){let h="",pln=0,gain=0,buys=0;const miss=new Set();
+  for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
+    pln+=c.value*c.f;gain+=c.gain*c.f;buys+=c.buys*c.f;
+    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(c.gain*c.f,"PLN")} (${pct(c.ret)})</span></button>`}
+  return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(pln,"PLN")}</div>
+   <div class="row"><span>Wynik łącznie</span><b>${sg(gain,"PLN")} (${pct(buys>0?gain/buys:NaN)})</b></div>
+   ${miss.size?`<p class="bad">Brak kursu do PLN dla: ${[...miss].map(esc).join(", ")}. Te portfele nie są wliczone.</p>`:""}</div><div class="card">${h}</div>`}
+
+function viewStk(){
+  if(!S.pf.length)pid="";else if(pid==="all"&&S.pf.length===1)pid=S.pf[0].id;else if(pid!=="all"&&!S.pf.find(p=>p.id===pid))pid="all";
+  const sel=S.pf.length?`<select data-pfsel>${S.pf.length>1?`<option value="all"${pid==="all"?" selected":""}>Wszystkie portfele (w PLN)</option>`:""}${S.pf.map(p=>`<option value="${esc(p.id)}"${p.id===pid?" selected":""}>${esc(p.name)} (${esc(p.cur)})</option>`).join("")}</select>`:"";
+  const newpf=`<div class="card"><b>Nowy portfel</b><label>Nazwa</label><input id="p-name" placeholder="np. IKE">
+   <div class="g2"><div><label>Właściciel</label><select id="p-owner">${OWNERS.map(o=>`<option>${o}</option>`).join("")}</select></div>
+   <div><label>Waluta portfela</label><select id="p-cur">${CURS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
+   <button data-addpf>Dodaj portfel</button></div>`;
+  if(!S.pf.length)return `<div class="card"><p class="mu">Nie ma jeszcze portfeli. Dodaj pierwszy, np. IKE w PLN albo portfel w USD.</p></div>`+newpf;
+  if(pid==="all")return sel+stkAll()+newpf;
+  const p=S.pf.find(x=>x.id===pid),c=calc(p),cur=p.cur;
+  const head=`<div class="card"><div class="mu">Wartość portfela</div><div class="big">${money(c.value,cur)}</div>${cur!=="PLN"&&c.f?`<div class="mu">≈ ${money(c.value*c.f,"PLN")}</div>`:""}
+   <div class="row"><span>Wynik łącznie</span><b>${sg(c.gain,cur)} (${pct(c.ret)})</b></div>
+   <div class="row"><span>Niezrealizowany</span><b>${sg(c.unreal,cur)}</b></div>
+   <div class="row"><span>Zrealizowany (sprzedaże)</span><b>${sg(c.realized,cur)}</b></div>
+   <div class="row"><span>Dywidendy</span><b>${money(c.divs,cur)}</b></div>
+   <div class="row"><span>Opłaty osobne</span><b>${money(c.fees,cur)}</b></div>
+   ${c.miss.length?`<p class="bad">Brak kursu w arkuszu dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
+   ${c.neg.length?`<p class="bad">Sprzedano więcej niż kupiono: ${c.neg.map(esc).join(", ")}. Sprawdź historię ruchów.</p>`:""}</div>`;
+  const pos=c.open.length?c.open.map(x=>`<div class="row"><span>${esc(x.sym)}<br><span class="mu">${fq(x.qty)} × śr. ${money(x.avg,cur)}</span></span><span style="text-align:right">${isNaN(x.price)?`<span class="mu">brak kursu</span>`:`<b>${money(x.value,cur)}</b><br>${sg(x.gain,cur)} (${pct(x.cost>0?x.gain/x.cost:NaN)})`}</span></div>`).join(""):`<p class="mu">Brak otwartych pozycji. Dodaj pierwszy zakup poniżej.</p>`;
+  const hist=S.tx.filter(t=>t.pid===p.id).sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1)).map(t=>`<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym||"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,cur)}`:money(t.amount,cur)}</span></button>`).join("");
+  const e=S.tx.find(x=>x.id===txEdit)||{type:"buy",date:today(),sym:"",qty:"",price:"",fee:"",amount:""};
+  const cash=e.type==="div"||e.type==="fee",v=x=>x===""||x==null||x===0?"":String(x).replace(".",",");
+  const form=`<div class="card"><b>${txEdit?"Edytuj ruch":"Dodaj ruch"}</b><p class="mu">Kwoty w walucie portfela (${esc(cur)}). Data może być wsteczna.</p>
+   <div class="g2"><div><label>Rodzaj</label><select id="t-type">${Object.keys(TL).map(k=>`<option value="${k}"${k===e.type?" selected":""}>${TL[k]}</option>`).join("")}</select></div>
+   <div><label>Data</label><input id="t-date" type="date" value="${esc(e.date)}"></div></div>
+   <label>Symbol (jak w arkuszu, np. WSE:XTB)</label><input id="t-sym" list="syms" value="${esc(e.sym||"")}"><datalist id="syms">${Object.keys(quotes).map(k=>`<option value="${esc(k)}">`).join("")}</datalist>
+   <div id="t-trade" style="display:${cash?"none":""}"><div class="g2"><div><label>Ilość</label><input id="t-qty" inputmode="decimal" value="${v(e.qty)}"></div><div><label>Cena za sztukę</label><input id="t-price" inputmode="decimal" value="${v(e.price)}"></div></div>
+   <label>Prowizja (opcjonalnie)</label><input id="t-fee" inputmode="decimal" value="${v(e.fee)}"></div>
+   <div id="t-cash" style="display:${cash?"":"none"}"><label>Kwota (dywidenda netto albo opłata)</label><input id="t-amount" inputmode="decimal" value="${v(e.amount)}"></div>
+   <div class="g2"><button data-txsave>Zapisz ruch</button>${txEdit?`<button class="ghost" data-txcancel>Anuluj</button>`:"<span></span>"}</div>
+   ${txEdit?`<p><button class="danger" data-txdel>Usuń ten ruch</button></p>`:""}</div>`;
+  return sel+head+`<div class="card"><b>Pozycje</b>${pos}</div>`+form+(hist?`<div class="card"><b>Historia ruchów</b>${hist}</div>`:"")+newpf+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`}
+
+document.addEventListener("change",e=>{
+  if(e.target.matches("[data-pfsel]")){pid=e.target.value;txEdit=null;render()}
+  if(e.target.id==="t-type"){const c=e.target.value==="div"||e.target.value==="fee";$("#t-trade").style.display=c?"none":"";$("#t-cash").style.display=c?"":"none"}});
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-pfgo],[data-addpf],[data-delpf],[data-txsave],[data-txedit],[data-txdel],[data-txcancel]");if(!t)return;const d=t.dataset;
+  if(d.pfgo){pid=d.pfgo;txEdit=null;render()}
+  else if("addpf" in d){const name=$("#p-name").value.trim();if(!name){alert("Wpisz nazwę portfela.");return}
+    const id=String(Date.now());S.pf=[...S.pf,{id,name,owner:$("#p-owner").value,cur:$("#p-cur").value}];pid=id;save()}
+  else if("delpf" in d){if(S.tx.some(x=>x.pid===pid)){alert("Ten portfel ma ruchy. Najpierw usuń je z historii.");return}
+    if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);pid="all";save()}}
+  else if(d.txedit){txEdit=d.txedit;render();scrollTo(0,0)}
+  else if("txcancel" in d){txEdit=null;render()}
+  else if("txdel" in d){if(confirm("Usunąć ten ruch?")){S.tx=S.tx.filter(x=>x.id!==txEdit);txEdit=null;save()}}
+  else if("txsave" in d){
+    const type=$("#t-type").value,date=$("#t-date").value,sym=$("#t-sym").value.trim().toUpperCase();
+    const qty=num($("#t-qty").value),price=num($("#t-price").value),fee=num($("#t-fee").value)||0,amount=num($("#t-amount").value);
+    const trade=type==="buy"||type==="sell";
+    if(!date||((trade||type==="div")&&!sym)||(trade&&!(qty>0&&price>=0))||(!trade&&!(amount>0))){alert("Uzupełnij datę, symbol oraz ilość i cenę (zakup, sprzedaż) albo kwotę (dywidenda, opłata).");return}
+    const rec={id:txEdit||String(Date.now()),pid,type,date,sym,qty:trade?qty:0,price:trade?price:0,fee:trade?fee:0,amount:trade?0:amount};
+    S.tx=txEdit?S.tx.map(x=>x.id===txEdit?rec:x):[...S.tx,rec];txEdit=null;save()}});
+
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
 function render(){const app=$("#app");
@@ -134,7 +229,7 @@ function render(){const app=$("#app");
     <label>E-mail</label><input id="l-mail" type="email" value="${EMAIL}" autocomplete="username">
     <label>Hasło</label><input id="l-pass" type="password" autocomplete="current-password">
     ${loginErr?`<p class="bad">${esc(loginErr)}</p>`:""}<button type="submit" style="width:100%">Zaloguj</button></form>`;return}
-  const body=tab==="all"?viewAll():tab==="sav"?viewSav():viewSoon({stk:"Akcje",bnd:"Obligacje",ppk:"PPK"}[tab]);
+  const body=tab==="all"?viewAll():tab==="sav"?viewSav():tab==="stk"?viewStk():viewSoon({bnd:"Obligacje",ppk:"PPK"}[tab]);
   const tabs=[["all","Wszystko"],["sav","Konta"],["stk","Akcje"],["bnd","Obligacje"],["ppk","PPK"]];
   app.innerHTML=`<header><h1>Portfel</h1><button class="ghost" data-out>Wyloguj</button></header>
    <div class="st">${esc(info)}${err?` <span class="bad">${esc(err)}</span>`:""}</div><main>${body}</main>
@@ -161,7 +256,7 @@ document.addEventListener("click",e=>{
 onAuthStateChanged(auth,u=>{user=u;booted=true;
   if(unsub){unsub();unsub=null}
   if(u){
-    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];err="";render()},
+    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];err="";render()},
       e=>{err="Brak dostępu do bazy: "+e.code;render()});
     loadRates()}
   render()});
