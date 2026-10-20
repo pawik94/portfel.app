@@ -121,7 +121,7 @@ function viewSav(){const tt=totals();
   <div class="card"><b>${editId?"Edytuj konto":"Dodaj konto"}</b>
    <label>Nazwa (np. Revolut, ING oszczędnościowe)</label><input id="f-name" value="${esc(a.name)}">
    <div class="g2"><div><label>Właściciel</label><select id="f-owner">${OWNERS.map(o=>`<option${o===a.owner?" selected":""}>${o}</option>`).join("")}</select></div>
-   <div><label>Waluta</label><input id="f-cur" list="curs" value="${esc(a.cur)}" maxlength="3"><datalist id="curs"><option>PLN<option>EUR<option>USD<option>GBP<option>CHF<option>CZK</datalist></div></div>
+   <div><label>Waluta</label><select id="f-cur">${[...new Set(["PLN","EUR","USD","GBP","CHF","CZK","SEK","NOK","DKK","HUF","CAD","AUD","JPY",a.cur])].map(c=>`<option${c===a.cur?" selected":""}>${c}</option>`).join("")}</select></div></div>
    <label>Saldo</label><input id="f-amount" inputmode="decimal" value="${a.amount===""?"":String(a.amount).replace(".",",")}">
    <div class="g2"><button data-save>Zapisz konto</button>${editId?`<button class="ghost" data-cancel>Anuluj</button>`:"<span></span>"}</div>
    ${editId?`<p><button class="danger" data-del>Usuń to konto</button></p>`:""}</div>`}
