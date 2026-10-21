@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2b3a67">
 <title>Portfel</title>
 <style>
-:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318}
-@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066}}
+:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5}
+@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6}}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(68px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
@@ -33,6 +33,7 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);b
 nav button{flex:1;background:transparent;color:var(--mu);border-radius:0;padding:14px 2px;font-size:13px}
 nav button.on{color:var(--ac);font-weight:700;box-shadow:inset 0 2px 0 var(--ac)}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}
+ .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 </style>
 </head>
@@ -53,7 +54,7 @@ const firebaseConfig={
 };
 const CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRmNNUaIptQmyWUjvLpJf6oeRlft0DVEbXqoXA0CzfowQizt9uNzR4WFDZT1qW0YCuG9-6RLune9e1C/pub?gid=0&single=true&output=csv";
 const EMAIL="portfel.app@portfel.pl";
-const OWNERS=["Kuba","Żona","Wspólne"];
+const OWNERS=["Jakub","Beata","Wspólne"];
 
 const auth=getAuth(initializeApp(firebaseConfig));
 const db=getFirestore(auth.app);
@@ -103,14 +104,19 @@ function totals(){let t=0;const by={},miss=new Set();
 
 function warn(tt){return tt.miss.length?`<p class="bad">Brak kursu do PLN dla: ${tt.miss.map(esc).join(", ")}. Te konta nie są wliczone. Dodaj w arkuszu wiersz CURRENCY:${esc(tt.miss[0])}PLN.</p>`:""}
 
-function viewAll(){const tt=totals(),sk=stkTotals(),sv=tt.t,bt=bondTotals(),pv=ppkCalc().value;tt.t+=sk.pln+bt.value+pv;OWNERS.forEach(o=>tt.by[o]=(tt.by[o]||0)+(sk.by[o]||0)+(bt.by[o]||0)+(o==="Kuba"?pv:0));tt.miss=[...new Set([...tt.miss,...sk.miss])];
-  return `<div class="card"><div class="mu">Razem</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div>
-  <div class="card"><div class="mu">Kto ma</div>${OWNERS.map(o=>`<div class="row"><span>${o}</span><b>${money(tt.by[o]||0,"PLN")}</b></div>`).join("")}</div>
-  <div class="card"><div class="mu">Działy</div>
-   <div class="row"><span>Oszczędności i konta</span><b>${money(sv,"PLN")}</b></div>
-   <div class="row"><span>Akcje</span><b>${money(sk.pln,"PLN")}</b></div>
-   <div class="row"><span>Obligacje</span><b>${money(bt.value,"PLN")}</b></div>
-   <div class="row"><span>PPK</span><b>${money(pv,"PLN")}</b></div></div>`}
+function donut(parts){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return `<p class="mu">Brak danych do wykresu.</p>`;
+  let off=25,cum=0,segs="",lab="";
+  for(const p of parts){if(!(p.v>0))continue;const q=p.v/tot*100;
+    segs+=`<circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(${p.c})" stroke-width="7" stroke-dasharray="${q} ${100-q}" stroke-dashoffset="${off}"/>`;
+    if(q>=6){const a=(cum+q/2)/100*2*Math.PI-Math.PI/2;lab+=`<text x="${21+15.9155*Math.cos(a)}" y="${21+15.9155*Math.sin(a)}" text-anchor="middle" dominant-baseline="central" font-size="3.4" font-weight="700" fill="var(--card)">${Math.round(q)}%</text>`}
+    off-=q;cum+=q}
+  return `<svg viewBox="0 0 42 42" role="img" aria-label="Podział aktywów" style="width:240px;max-width:75%;display:block;margin:0 auto 10px">${segs}${lab}</svg>`}
+
+function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pv=ppkCalc().value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
+  const parts=[{n:"Oszczędności i konta",v:sv,c:"--c1"},{n:"Akcje",v:sk.pln,c:"--c2"},{n:"Obligacje",v:bt.value,c:"--c3"},{n:"PPK",v:pv,c:"--c4"}];
+  const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+" %":"–";
+  return `<div class="card"><div class="mu">Razem</div><div class="big">${money(total,"PLN")}</div>${warn({miss:[...new Set([...tt.miss,...sk.miss])]})}</div>
+  <div class="card">${donut(parts)}${parts.map(x=>`<div class="row"><span><i class="dot" style="background:var(${x.c})"></i>${x.n}</span><b>${money(x.v,"PLN")} <span class="mu">${pc(x.v)}</span></b></div>`).join("")}</div>`}
 
 function viewSav(){const tt=totals();
   const a=S.accounts.find(x=>x.id===editId)||{name:"",owner:OWNERS[0],cur:"PLN",amount:""};
@@ -221,7 +227,8 @@ document.addEventListener("click",e=>{
     const rec={id:txEdit||String(Date.now()),pid,type,date,sym,qty:trade?qty:0,price:trade?price:0,fee:trade?fee:0,amount:trade?0:amount};
     S.tx=txEdit?S.tx.map(x=>x.id===txEdit?rec:x):[...S.tx,rec];txEdit=null;save()}});
 
-const BT={EDO:{y:10,cap:1,fee:3},COI:{y:4,cap:0,fee:2},ROD:{y:12,cap:1,fee:3},ROS:{y:6,cap:0,fee:2}};
+const BT={EDO:{y:10,cap:1,infl:1,fee:3},ROD:{y:12,cap:1,infl:1,fee:3},COI:{y:4,cap:0,infl:1,fee:2},ROS:{y:6,cap:0,infl:1,fee:2},TOS:{y:3,cap:1,infl:0,fee:1},DOR:{y:2,cap:0,infl:0,fee:0.7,mon:1},ROR:{y:1,cap:0,infl:0,fee:0.5,mon:1},OTS:{y:0.25,cap:0,infl:0,fee:0}};
+const dAddM=(x,m)=>{const d=D(x);d.setMonth(d.getMonth()+m);return d};
 const LAG=2,SRC={own:"Moje",emp:"Pracodawca",state:"Państwo"};
 let bEdit=null,peEdit=null;
 const D=x=>new Date(x+"T00:00:00");
@@ -232,14 +239,19 @@ const fp=r=>String(Math.round(r*100)/100).replace(".",",")+"%";
 const vv=x=>x===""||x==null?"":String(x).replace(".",",");
 const inflOf=k=>{const x=S.infl.find(i=>i.m===k);return x?x.v:null};
 
-function bondCalc(b){const now=D(today()),P=100*b.qty;let C=P,paid=0,acc=0;const rates=[],miss=[];
-  for(let k=0;k<b.years;k++){const st=dAdd(b.date,k),e=dAdd(b.date,k+1);if(st>now)break;
-    let r;if(k===0)r=b.r1;else{const key=mk(st),c=inflOf(key);if(c==null){miss.push(key);r=b.margin}else r=c+b.margin}
-    rates.push(r);const base=b.cap?C:P,i=base*r/100;
-    if(e<=now){if(b.cap)C+=i;else paid+=i}else acc=i*((now-st)/864e5)/365}
-  const end=dAdd(b.date,b.years),matured=end<=now,interest=(b.cap?C-P:paid)+acc;
-  const fee=matured?0:Math.min((b.fee||0)*b.qty,Math.max(interest,0)),net=interest-fee-Math.max(interest-fee,0)*0.19;
-  return{P,value:(b.cap?C:P)+acc,interest,net,rates,miss,end,matured}}
+function bondCalc(b){const now=D(today()),P=100*b.qty,M=Math.round(b.years*12),end=dAddM(b.date,M),matured=end<=now,inf=b.infl!==false,ty=BT[b.type]||{};
+  let C=P,acc=0,nextPay=null;const rates=[],miss=[];
+  if(ty.mon){let n=0;while(n<M&&dAddM(b.date,n+1)<=now)n++;
+    if(!matured){acc=P*b.r1/100*((now-dAddM(b.date,n))/864e5)/365;nextPay=dAddM(b.date,n+1)}rates.push(b.r1)}
+  else for(let k=0;k*12<M;k++){const st=dAddM(b.date,12*k);if(st>now)break;
+    const ne=dAddM(b.date,12*(k+1)),e=ne<end?ne:end,full=ne<=end;
+    let r;if(k===0||!inf)r=b.r1;else{const key=mk(st),c=inflOf(key);if(c==null){miss.push(key);r=b.margin}else r=c+b.margin}
+    rates.push(r);const base=b.cap?C:P,yr=base*r/100;
+    if(e<=now){if(b.cap)C+=full?yr:yr*((e-st)/864e5)/365}
+    else{acc=yr*((now-st)/864e5)/365;nextPay=e}}
+  const interest=(b.cap?C-P:0)+acc;
+  const fee=matured?0:Math.min((b.fee||0)*b.qty,Math.max(interest,0)),net=b.cap?interest-fee-Math.max(interest-fee,0)*0.19:Math.max(interest,0)*0.81;
+  return{P,value:(b.cap?C:P)+acc,interest,net,rates,miss,end,matured,nextPay}}
 
 function bondTotals(){let value=0,invested=0,interest=0;const by={};
   for(const b of S.bonds){const c=bondCalc(b);if(c.matured)continue;value+=c.value;invested+=c.P;interest+=c.interest;by[b.owner]=(by[b.owner]||0)+c.value}
@@ -250,22 +262,23 @@ function viewBnd(){
   const miss=[...new Set(list.filter(x=>!x.c.matured).flatMap(x=>x.c.miss))].sort();
   const sum=`<div class="card"><div class="mu">Obligacje, wartość szacunkowa</div><div class="big">${money(bt.value,"PLN")}</div>
    <div class="row"><span>Wpłacono (bez wykupionych)</span><b>${money(bt.invested,"PLN")}</b></div>
-   <div class="row"><span>Odsetki naliczone (brutto)</span><b>${sg(bt.interest,"PLN")}</b></div>
+   <div class="row"><span>Odsetki naliczone, niewypłacone (brutto)</span><b>${sg(bt.interest,"PLN")}</b></div>
    ${miss.length?`<p class="bad">Brak inflacji za: ${miss.join(", ")}. Wpisz ją niżej. Na razie liczę tylko marżę, więc wartość jest zaniżona.</p>`:""}</div>`;
   const items=list.length?list.map(({b,c})=>{const left=Math.ceil((c.end-D(today()))/864e5);
-    return `<button class="item" data-bedit="${esc(b.id)}"><span>${esc(b.name||b.type)} (${b.type}), ${fq(b.qty)} szt.<br><span class="mu">${esc(b.owner)}, kupno ${esc(b.date)}<br>wykup ${dd(c.end)} ${c.matured?"(termin minął, usuń po wypłacie)":"(za "+left+" dni)"}<br>oprocentowanie w kolejnych latach: ${c.rates.map((r,i)=>(i+1)+": "+fp(r)).join(", ")}</span></span><span style="text-align:right"><b>${money(c.value,"PLN")}</b><br>${sg(c.interest,"PLN")}<br><span class="mu">netto ${money(c.net,"PLN")}</span></span></button>`}).join(""):`<p class="mu">Nie ma jeszcze obligacji. Dodaj pierwszą poniżej.</p>`;
-  const e=S.bonds.find(x=>x.id===bEdit)||{type:"EDO",name:"",owner:OWNERS[0],date:today(),qty:"",r1:"",margin:"",years:10,cap:1,fee:3};
-  const form=`<div class="card"><b>${bEdit?"Edytuj obligacje":"Dodaj obligacje"}</b><p class="mu">Dane z potwierdzenia zakupu. Jedna sztuka to 100 zł. Lata, kapitalizację i opłatę sprawdź w warunkach swojej serii.</p>
+    return `<button class="item" data-bedit="${esc(b.id)}"><span>${esc(b.name||b.type)} (${b.type}), ${fq(b.qty)} szt.<br><span class="mu">${esc(b.owner)}, kupno ${esc(b.date)}<br>wykup ${dd(c.end)} ${c.matured?"(termin minął, usuń po wypłacie)":"(za "+left+" dni)"}${c.nextPay&&!b.cap&&!c.matured?`<br>najbliższa wypłata odsetek: ${dd(c.nextPay)}`:""}<br>oprocentowanie w kolejnych latach: ${c.rates.map((r,i)=>(i+1)+": "+fp(r)).join(", ")}</span></span><span style="text-align:right"><b>${money(c.value,"PLN")}</b><br>${sg(c.interest,"PLN")}<br><span class="mu">${b.cap?"odsetki":"od ostatniej wypłaty"}<br>${b.cap?"netto przy wykupie dziś":"netto po podatku"} ${money(c.net,"PLN")}</span></span></button>`}).join(""):`<p class="mu">Nie ma jeszcze obligacji. Dodaj pierwszą poniżej.</p>`;
+  const e=S.bonds.find(x=>x.id===bEdit)||{type:"EDO",name:"",owner:OWNERS[0],date:today(),qty:"",r1:"",margin:"",years:10,cap:1,infl:1,fee:3};
+  const form=`<div class="card"><b>${bEdit?"Edytuj obligacje":"Dodaj obligacje"}</b><p class="mu">Dane z potwierdzenia zakupu. Jedna sztuka to 100 zł. Lata, sposób naliczania i opłatę sprawdź w warunkach swojej serii. Przy obligacjach o zmiennej stopie (DOR, ROR) wpisz aktualne oprocentowanie, liczę je jako stałe.</p>
    <div class="g2"><div><label>Rodzaj</label><select id="b-type">${Object.keys(BT).map(k=>`<option${k===e.type?" selected":""}>${k}</option>`).join("")}</select></div>
-   <div><label>Seria (np. EDO0334)</label><input id="b-name" value="${esc(e.name)}"></div></div>
+   <div><label>Seria (np. COI0428)</label><input id="b-name" value="${esc(e.name)}"></div></div>
    <div class="g2"><div><label>Właściciel</label><select id="b-owner">${OWNERS.map(o=>`<option${o===e.owner?" selected":""}>${o}</option>`).join("")}</select></div>
    <div><label>Data zakupu</label><input id="b-date" type="date" value="${esc(e.date)}"></div></div>
    <div class="g2"><div><label>Liczba sztuk</label><input id="b-qty" inputmode="decimal" value="${vv(e.qty)}"></div>
    <div><label>Oprocentowanie 1. roku (%)</label><input id="b-r1" inputmode="decimal" value="${vv(e.r1)}"></div></div>
-   <div class="g2"><div><label>Marża od 2. roku (%)</label><input id="b-margin" inputmode="decimal" value="${vv(e.margin)}"></div>
-   <div><label>Czas trwania (lata)</label><input id="b-years" inputmode="numeric" value="${e.years}"></div></div>
-   <div class="g2"><div><label>Kapitalizacja odsetek</label><select id="b-cap"><option value="1"${e.cap?" selected":""}>tak (odsetki doliczane)</option><option value="0"${e.cap?"":" selected"}>nie (wypłacane co roku)</option></select></div>
-   <div><label>Opłata za wcześn. wykup (zł/szt.)</label><input id="b-fee" inputmode="decimal" value="${vv(e.fee)}"></div></div>
+   <div class="g2"><div><label>Oprocentowanie od 2. roku</label><select id="b-infl"><option value="1"${e.infl!==false&&e.infl!==0?" selected":""}>inflacja + marża</option><option value="0"${e.infl===false||e.infl===0?" selected":""}>stałe, jak w 1. roku</option></select></div>
+   <div><label>Marża (%)</label><input id="b-margin" inputmode="decimal" value="${vv(e.margin)}"></div></div>
+   <div class="g2"><div><label>Czas trwania (lata)</label><input id="b-years" inputmode="decimal" value="${vv(e.years)}"></div>
+   <div><label>Odsetki</label><select id="b-cap"><option value="1"${e.cap?" selected":""}>kapitalizowane (doliczane)</option><option value="0"${e.cap?"":" selected"}>wypłacane (co rok / miesiąc)</option></select></div></div>
+   <label>Opłata za wcześn. wykup (zł/szt.)</label><input id="b-fee" inputmode="decimal" value="${vv(e.fee)}">
    <div class="g2"><button data-bsave>Zapisz</button>${bEdit?`<button class="ghost" data-bcancel>Anuluj</button>`:"<span></span>"}</div>
    ${bEdit?`<p><button class="danger" data-bdel>Usuń obligacje</button></p>`:""}</div>`;
   const cpi=`<div class="card"><b>Inflacja GUS (r/r)</b><p class="mu">Od 2. roku oprocentowanie = inflacja + marża. Dla okresu zaczynającego się w danym miesiącu bierze się inflację ogłoszoną miesiąc wcześniej, czyli za miesiąc sprzed ${LAG} miesięcy (np. okres od czerwca: inflacja za kwiecień).</p>
@@ -283,12 +296,12 @@ function ppkCalc(){const P=S.ppk,price=P.price||0,src={own:{u:0,c:0},emp:{u:0,c:
 
 function viewPpk(){const P=S.ppk,c=ppkCalc();
   const e=P.e.find(x=>x.id===peEdit)||{date:today(),src:"own",amount:"",units:""};
-  const top=`<div class="card"><div class="mu">PPK, wartość rachunku</div><div class="big">${money(c.value,"PLN")}</div>
-   <div class="row"><span>Wpłacono razem (ja, pracodawca, państwo)</span><b>${money(c.contrib,"PLN")}</b></div>
+  const top=`<div class="card"><div class="mu">PPK${P.fund?", "+esc(P.fund):""}, wartość rachunku</div><div class="big">${money(c.value,"PLN")}</div>
+   <div class="row"><span>Wpłacono razem</span><b>${money(c.contrib,"PLN")}</b></div>
    <div class="row"><span>Wynik</span><b>${sg(c.gain,"PLN")} (${pct(c.ret)})</b></div>
    <div class="row"><span>Jednostki</span><b>${fq(c.units)}</b></div>
    ${P.price>0?"":`<p class="bad">Wpisz kurs jednostki, żeby zobaczyć wartość.</p>`}
-   <label>Kurs jednostki (zł)${P.pdate?", z dnia "+esc(P.pdate):""}</label><div class="g2"><input id="pp-price" inputmode="decimal" value="${vv(P.price||"")}"><input id="pp-date" type="date" value="${esc(P.pdate||today())}"></div>
+   <label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu"><label>Kurs jednostki (zł)${P.pdate?", z dnia "+esc(P.pdate):""}</label><div class="g2"><input id="pp-price" inputmode="decimal" value="${vv(P.price||"")}"><input id="pp-date" type="date" value="${esc(P.pdate||today())}"></div>
    <button data-ppsave>Zapisz kurs</button></div>`;
   const by=`<div class="card"><div class="mu">Podział wg źródła</div>${Object.keys(SRC).map(k=>`<div class="row"><span>${SRC[k]}<br><span class="mu">wpłacono ${money(c.src[k].c,"PLN")}, ${fq(c.src[k].u)} jedn.</span></span><b>${money(c.src[k].v,"PLN")}</b></div>`).join("")}</div>`;
   const calc=`<div class="card"><b>Gdybym wypłacił dziś przed 60. rokiem życia</b>
@@ -306,22 +319,13 @@ function viewPpk(){const P=S.ppk,c=ppkCalc();
    <div><label>Liczba jednostek</label><input id="pe-units" inputmode="decimal" value="${vv(e.units)}"></div></div>
    <div class="g2"><button data-pesave>Zapisz wpłatę</button>${peEdit?`<button class="ghost" data-pecancel>Anuluj</button>`:"<span></span>"}</div>
    ${peEdit?`<p><button class="danger" data-pedel>Usuń wpłatę</button></p>`:""}</div>
-   <div class="card"><b>Import z pliku CSV</b><p class="mu">Kolumny po kolei: data, źródło (moje / pracodawca / państwo), kwota, jednostki. Separator ; lub , (przecinek dziesiętny też działa).</p><input id="pp-file" type="file" accept=".csv,.txt"><p id="pp-imp" class="mu"></p></div>`;
+   `;
   const rows=[...P.e].sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1));
   const hist=rows.length?`<div class="card"><b>Wpłaty (ostatnie 30 z ${rows.length})</b>${rows.slice(0,30).map(x=>`<button class="item" data-peedit="${esc(x.id)}"><span>${esc(x.date)}<br><span class="mu">${SRC[x.src]}</span></span><span style="text-align:right"><b>${money(x.amount,"PLN")}</b><br><span class="mu">${fq(x.units)} jedn.</span></span></button>`).join("")}</div>`:"";
   return top+by+calc+form+hist}
 
-function importPpk(f){if(!f)return;const r=new FileReader();r.onload=()=>{
-  const lines=String(r.result).split(/\r?\n/).filter(l=>l.trim()),del=lines[0]&&lines[0].includes(";")?";":",";let ok=0,bad=0;const add=[];
-  const nd=x=>{x=x.trim();let m=x.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=x.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);return m?m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"):null};
-  for(const l of lines){const c=l.split(del).map(z=>z.replace(/"/g,"").trim()),d=nd(c[0]||"");if(!d){if(add.length||ok)bad++;continue}
-    const t=(c[1]||"").toLowerCase(),src=/prac/.test(t)?"emp":/pa[nń]stw|dop[lł]at|powit/.test(t)?"state":/moj|moje|uczest|w[lł]asn/.test(t)?"own":null,am=num(c[2]),un=num(c[3]);
-    if(!src||!(am>0)||!(un>0)){bad++;continue}add.push({id:String(Date.now())+"-"+(ok++),date:d,src,amount:am,units:un})}
-  S.ppk={...S.ppk,e:[...S.ppk.e,...add]};save();setTimeout(()=>{const n=$("#pp-imp");if(n)n.textContent="Zaimportowano "+add.length+", pominięto "+bad+" wierszy."},300)};r.readAsText(f)}
-
 document.addEventListener("change",e=>{
-  if(e.target.id==="b-type"){const t=BT[e.target.value];$("#b-years").value=t.y;$("#b-cap").value=t.cap;$("#b-fee").value=t.fee}
-  if(e.target.id==="pp-file"){importPpk(e.target.files[0]);e.target.value=""}});
+  if(e.target.id==="b-type"){const t=BT[e.target.value];$("#b-years").value=vv(t.y);$("#b-cap").value=t.cap;$("#b-infl").value=t.infl;$("#b-fee").value=vv(t.fee)}});
 
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-bak],[data-bedit],[data-bsave],[data-bcancel],[data-bdel],[data-cpisave],[data-cpidel],[data-ppsave],[data-pesave],[data-peedit],[data-pecancel],[data-pedel]");if(!t)return;const d=t.dataset;
@@ -329,15 +333,16 @@ document.addEventListener("click",e=>{
   else if(d.bedit){bEdit=d.bedit;render();scrollTo(0,document.body.scrollHeight)}
   else if("bcancel" in d){bEdit=null;render()}
   else if("bdel" in d){if(confirm("Usunąć te obligacje?")){S.bonds=S.bonds.filter(x=>x.id!==bEdit);bEdit=null;save()}}
-  else if("bsave" in d){const date=$("#b-date").value,qty=num($("#b-qty").value),r1=num($("#b-r1").value),margin=num($("#b-margin").value),years=parseInt($("#b-years").value),fee=num($("#b-fee").value)||0;
-    if(!date||!(qty>0)||!(r1>=0)||!(margin>=0)||!(years>0)){alert("Uzupełnij datę, liczbę sztuk, oprocentowanie 1. roku, marżę i lata.");return}
-    const rec={id:bEdit||String(Date.now()),type:$("#b-type").value,name:$("#b-name").value.trim(),owner:$("#b-owner").value,date,qty,r1,margin,years,cap:$("#b-cap").value==="1",fee};
+  else if("bsave" in d){const date=$("#b-date").value,qty=num($("#b-qty").value),r1=num($("#b-r1").value),margin=num($("#b-margin").value)||0,years=num($("#b-years").value),fee=num($("#b-fee").value)||0;
+    if(!date||!(qty>0)||!(r1>=0)||!(years>0)){alert("Uzupełnij datę, liczbę sztuk, oprocentowanie 1. roku i czas trwania.");return}
+    const rec={id:bEdit||String(Date.now()),type:$("#b-type").value,name:$("#b-name").value.trim(),owner:$("#b-owner").value,date,qty,r1,margin,years,cap:$("#b-cap").value==="1",infl:$("#b-infl").value==="1",fee};
     S.bonds=bEdit?S.bonds.map(x=>x.id===bEdit?rec:x):[...S.bonds,rec];bEdit=null;save()}
   else if("cpisave" in d){const m=$("#c-m").value,v=num($("#c-v").value);if(!m||isNaN(v)){alert("Wybierz miesiąc i wpisz inflację.");return}
     S.infl=[...S.infl.filter(i=>i.m!==m),{m,v}];save()}
   else if(d.cpidel){if(confirm("Usunąć wpis inflacji "+d.cpidel+"?")){S.infl=S.infl.filter(i=>i.m!==d.cpidel);save()}}
-  else if("ppsave" in d){const price=num($("#pp-price").value);if(!(price>0)){alert("Wpisz kurs jednostki.");return}
-    S.ppk={...S.ppk,price,pdate:$("#pp-date").value};save()}
+  else if("ppsave" in d){const price=num($("#pp-price").value),fund=$("#pp-fund").value.trim();
+    if(!(price>0)&&!fund){alert("Wpisz kurs jednostki lub nazwę funduszu.");return}
+    S.ppk={...S.ppk,fund,price:price>0?price:S.ppk.price,pdate:price>0?$("#pp-date").value:S.ppk.pdate};save()}
   else if(d.peedit){peEdit=d.peedit;render();scrollTo(0,document.body.scrollHeight)}
   else if("pecancel" in d){peEdit=null;render()}
   else if("pedel" in d){if(confirm("Usunąć tę wpłatę?")){S.ppk={...S.ppk,e:S.ppk.e.filter(x=>x.id!==peEdit)};peEdit=null;save()}}
@@ -381,7 +386,7 @@ document.addEventListener("click",e=>{
 onAuthStateChanged(auth,u=>{user=u;booted=true;
   if(unsub){unsub();unsub=null}
   if(u){
-    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",e:[]},S.ppk||{});err="";render()},
+    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));err="";render()},
       e=>{err="Brak dostępu do bazy: "+e.code;render()});
     loadRates()}
   render()});
