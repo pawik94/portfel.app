@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2b3a67">
 <title>Portfel</title>
 <style>
-:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5}
-@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6}}
+:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d}
+@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6;--good:#4ade80}}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(68px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
@@ -33,7 +33,11 @@ nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);b
 nav button{flex:1;background:transparent;color:var(--mu);border-radius:0;padding:14px 2px;font-size:13px}
 nav button.on{color:var(--ac);font-weight:700;box-shadow:inset 0 2px 0 var(--ac)}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}
- .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+ .good{color:var(--good)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;overflow:auto;padding:12px}
+.sh{max-width:560px;margin:2vh auto;background:var(--bg);border-radius:12px;padding:8px 10px 2px}
+.sub{padding:0 0 6px 10px;border-left:2px solid var(--bd);margin-left:2px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 </style>
 </head>
@@ -75,10 +79,10 @@ function parseCsv(t){const rows=[];let r=[],f="",q=false;
   if(f||r.length){r.push(f);rows.push(r)}return rows}
 
 function applyRows(rows){rates={PLN:1};quotes={};
-  for(const [s,k,w] of rows){if(!s)continue;
+  for(const r of rows){const s=r[0];if(!s)continue;const four=r.length>=4,name=four?r[1]:"",k=four?r[2]:r[1],w=four?r[3]:r[2];
     const m=s.match(/^CURRENCY:([A-Z]{3})PLN$/);
     if(m){const n=num(k);if(n>0)rates[m[1]]=n}
-    else quotes[s]={price:num(k),fx:num(w)}}}
+    else quotes[s]={name:name||s,price:num(k),fx:num(w)}}}
 
 async function loadRates(){
   try{const res=await fetch(CSV_URL,{cache:"no-store"});if(!res.ok)throw new Error("http");
@@ -90,7 +94,7 @@ async function loadRates(){
     catch(_){info="Brak kursów: nie udało się pobrać arkusza"}}
   render()}
 
-async function save(){
+async function save(){modal=null;
   try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx,bonds:S.bonds,infl:S.infl,ppk:S.ppk},{merge:true});err=""}
   catch(e){err="Nie zapisano: "+e.code}
   render()}
@@ -121,39 +125,47 @@ function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pv=ppkCalc()
 function viewSav(){const tt=totals();
   const a=S.accounts.find(x=>x.id===editId)||{name:"",owner:OWNERS[0],cur:"PLN",amount:""};
   const list=S.accounts.length?S.accounts.map(x=>{const r=rates[x.cur];
-    return `<button class="item" data-edit="${esc(x.id)}"><span>${esc(x.name)}<br><span class="mu">${esc(x.owner)}</span></span><span style="text-align:right"><b>${money(x.amount,x.cur)}</b>${x.cur!=="PLN"&&r?`<br><span class="mu">≈ ${money(x.amount*r,"PLN")}</span>`:""}</span></button>`}).join(""):`<p class="mu">Nie ma jeszcze żadnych kont. Dodaj pierwsze poniżej.</p>`;
-  return `<div class="card"><div class="mu">Suma w PLN</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div>
-  <div class="card">${list}</div>
-  <div class="card"><b>${editId?"Edytuj konto":"Dodaj konto"}</b>
+    return `<button class="item" data-edit="${esc(x.id)}"><span>${esc(x.name)}<br><span class="mu">${esc(x.owner)}</span></span><span style="text-align:right"><b>${money(x.amount,x.cur)}</b>${x.cur!=="PLN"&&r?`<br><span class="mu">≈ ${money(x.amount*r,"PLN")}</span>`:""}</span></button>`}).join(""):`<p class="mu">Nie ma jeszcze żadnych kont.</p>`;
+  const form=`<div class="card"><b>${editId?"Edytuj konto":"Dodaj konto"}</b>
    <label>Nazwa (np. Revolut, ING oszczędnościowe)</label><input id="f-name" value="${esc(a.name)}">
    <div class="g2"><div><label>Właściciel</label><select id="f-owner">${OWNERS.map(o=>`<option${o===a.owner?" selected":""}>${o}</option>`).join("")}</select></div>
-   <div><label>Waluta</label><select id="f-cur">${[...new Set(["PLN","EUR","USD","GBP","CHF","CZK","SEK","NOK","DKK","HUF","CAD","AUD","JPY",a.cur])].map(c=>`<option${c===a.cur?" selected":""}>${c}</option>`).join("")}</select></div></div>
+   <div><label>Waluta</label><select id="f-cur">${[...new Set([...CURS,a.cur])].map(c=>`<option${c===a.cur?" selected":""}>${c}</option>`).join("")}</select></div></div>
    <label>Saldo</label><input id="f-amount" inputmode="decimal" value="${a.amount===""?"":String(a.amount).replace(".",",")}">
-   <div class="g2"><button data-save>Zapisz konto</button>${editId?`<button class="ghost" data-cancel>Anuluj</button>`:"<span></span>"}</div>
-   ${editId?`<p><button class="danger" data-del>Usuń to konto</button></p>`:""}</div>`}
+   <button data-save style="width:100%">Zapisz konto</button>
+   ${editId?`<p><button class="danger" data-del>Usuń to konto</button></p>`:""}</div>`;
+  return `<div class="card"><div class="mu">Suma w PLN</div><div class="big">${money(tt.t,"PLN")}</div>${warn(tt)}</div><div class="card">${list}</div><button data-open="acc" style="width:100%">+ Dodaj konto</button>${modal==="acc"?sheet(form):""}`}
 
 const CURS=["PLN","EUR","USD","GBP","CHF","CZK","SEK","NOK","DKK","HUF","CAD","AUD","JPY"];
 let pid="all",txEdit=null;
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-const pct=v=>isFinite(v)?(v>=0?"+":"")+(v*100).toFixed(2).replace(".",",")+" %":"–";
-const sg=(v,c)=>`<span class="${v<0?"bad":""}">${v>0?"+":""}${money(v,c)}</span>`;
+const pct=v=>isFinite(v)?`<span class="${v<0?"bad":v>0?"good":""}">${v>=0?"+":""}${(v*100).toFixed(2).replace(".",",")} %</span>`:"–";
+const sg=(v,c)=>`<span class="${v<0?"bad":v>0?"good":""}">${v>0?"+":""}${money(v,c)}</span>`;
 const fq=n=>String(Math.round(n*1e6)/1e6).replace(".",",");
 const TL={buy:"Zakup",sell:"Sprzedaż",div:"Dywidenda",fee:"Opłata"};
+
+let modal=null,ui={},txSym="",cpiKey="";
+const sheet=h=>`<div class="ov"><div class="sh"><div style="text-align:right"><button class="ghost" data-close>Zamknij</button></div>${h}</div></div>`;
+const nm=x=>quotes[x]?quotes[x].name:x;
+const rt=c=>c==="PLN"?1:rates[c];
+function ccyOf(sym){const q=quotes[sym];if(!q||!(q.fx>0))return null;if(Math.abs(q.fx-1)<1e-9)return "PLN";for(const c in rates)if(c!=="PLN"&&Math.abs(rates[c]/q.fx-1)<0.003)return c;return null}
+const effFx=t=>{const f=t.fx>0?t.fx:1,m=(t.mg||0)/100;return t.type==="sell"?f*(1-m):f*(1+m)};
 
 function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0;
   const txs=S.tx.filter(t=>t.pid===p.id).sort((a,b)=>a.date===b.date?(a.id<b.id?-1:1):(a.date<b.date?-1:1));
   for(const t of txs){
     if(!t.sym){fees+=t.amount||0;continue}
-    const P=pos[t.sym]||(pos[t.sym]={sym:t.sym,qty:0,cost:0});
-    if(t.type==="buy"){const c=t.qty*t.price+(t.fee||0);P.qty+=t.qty;P.cost+=c;buys+=c}
-    else if(t.type==="sell"){const avg=P.qty>0?P.cost/P.qty:0;realized+=t.qty*t.price-(t.fee||0)-t.qty*avg;P.cost-=t.qty*avg;P.qty-=t.qty}
+    const P=pos[t.sym]||(pos[t.sym]={sym:t.sym,qty:0,cost:0,costX:0});
+    if(t.type==="buy"){const c=(t.tot>0?t.tot:t.qty*t.price*effFx(t))+(t.fee||0);P.qty+=t.qty;P.cost+=c;P.costX+=t.qty*t.price;buys+=c}
+    else if(t.type==="sell"){const avg=P.qty>0?P.cost/P.qty:0,avgX=P.qty>0?P.costX/P.qty:0,pr=(t.tot>0?t.tot:t.qty*t.price*effFx(t))-(t.fee||0);
+      realized+=pr-t.qty*avg;P.cost-=t.qty*avg;P.costX-=t.qty*avgX;P.qty-=t.qty}
     else if(t.type==="div")divs+=t.amount||0;
     else if(t.type==="fee")fees+=t.amount||0}
   const open=[],miss=[],neg=[];let value=0,unreal=0;
   for(const P of Object.values(pos)){if(Math.abs(P.qty)<1e-9)continue;
     if(P.qty<0)neg.push(P.sym);
-    const q=quotes[P.sym],pr=q&&q.price>0?q.price:NaN;P.avg=P.qty?P.cost/P.qty:0;P.price=pr;
-    if(isNaN(pr))miss.push(P.sym);else{P.value=P.qty*pr;P.gain=P.value-P.cost;value+=P.value;unreal+=P.gain}
+    const q=quotes[P.sym],pr=q&&q.price>0?q.price:NaN,X=ccyOf(P.sym)||p.cur,k=X===p.cur?1:(rt(X)&&rt(p.cur)?rt(X)/rt(p.cur):NaN);
+    P.ccy=X;P.avg=P.qty?P.cost/P.qty:0;P.avgX=P.qty?P.costX/P.qty:0;P.price=pr;
+    if(isNaN(pr)||isNaN(k))miss.push(P.sym);else{P.value=P.qty*pr*k;P.gain=P.value-P.cost;value+=P.value;unreal+=P.gain}
     open.push(P)}
   const gain=unreal+realized+divs-fees;
   const f=rates[p.cur]||open.map(x=>quotes[x.sym]&&quotes[x.sym].fx).find(v=>v>0);
@@ -174,36 +186,49 @@ function stkAll(){let h="",pln=0,gain=0,buys=0;const miss=new Set();
 
 function viewStk(){
   if(!S.pf.length)pid="";else if(pid==="all"&&S.pf.length===1)pid=S.pf[0].id;else if(pid!=="all"&&!S.pf.find(p=>p.id===pid))pid="all";
-  const sel=S.pf.length?`<select data-pfsel>${S.pf.length>1?`<option value="all"${pid==="all"?" selected":""}>Wszystkie portfele (w PLN)</option>`:""}${S.pf.map(p=>`<option value="${esc(p.id)}"${p.id===pid?" selected":""}>${esc(p.name)} (${esc(p.cur)})</option>`).join("")}</select>`:"";
-  const newpf=`<div class="card"><b>Nowy portfel</b><label>Nazwa</label><input id="p-name" placeholder="np. IKE">
+  const one=pid&&pid!=="all";
+  const top=`<div class="g2" style="margin-bottom:12px"><button data-open="pf">+ Nowy portfel</button>${one?`<button data-open="tx">+ Dodaj ruch</button>`:"<span></span>"}</div>`;
+  const pfForm=`<div class="card"><b>Nowy portfel</b><label>Nazwa</label><input id="p-name" placeholder="np. IKE">
    <div class="g2"><div><label>Właściciel</label><select id="p-owner">${OWNERS.map(o=>`<option>${o}</option>`).join("")}</select></div>
    <div><label>Waluta portfela</label><select id="p-cur">${CURS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
-   <button data-addpf>Dodaj portfel</button></div>`;
-  if(!S.pf.length)return `<div class="card"><p class="mu">Nie ma jeszcze portfeli. Dodaj pierwszy, np. IKE w PLN albo portfel w USD.</p></div>`+newpf;
-  if(pid==="all")return sel+stkAll()+newpf;
+   <button data-addpf style="width:100%">Dodaj portfel</button></div>`;
+  const mod=modal==="pf"?sheet(pfForm):"";
+  const sel=S.pf.length?`<select data-pfsel>${S.pf.length>1?`<option value="all"${pid==="all"?" selected":""}>Wszystkie portfele (w PLN)</option>`:""}${S.pf.map(p=>`<option value="${esc(p.id)}"${p.id===pid?" selected":""}>${esc(p.name)} (${esc(p.cur)})</option>`).join("")}</select>`:"";
+  if(!S.pf.length)return top+`<div class="card"><p class="mu">Nie ma jeszcze portfeli. Dodaj pierwszy, np. IKE w PLN albo portfel w USD.</p></div>`+mod;
+  if(pid==="all")return top+sel+stkAll()+mod;
   const p=S.pf.find(x=>x.id===pid),c=calc(p),cur=p.cur;
+  const desc=(a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1);
+  const txItem=t=>{const X=ccyOf(t.sym)||cur;return `<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym?nm(t.sym):"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,X)}${t.fx>0&&Math.abs(t.fx-1)>1e-7?`<br><span class="mu">kurs ${vv(t.fx)}${t.mg?`, marża ${vv(t.mg)}%`:""}</span>`:""}`:money(t.amount,cur)}</span></button>`};
   const head=`<div class="card"><div class="mu">Wartość portfela</div><div class="big">${money(c.value,cur)}</div>${cur!=="PLN"&&c.f?`<div class="mu">≈ ${money(c.value*c.f,"PLN")}</div>`:""}
    <div class="row"><span>Wynik łącznie</span><b>${sg(c.gain,cur)} (${pct(c.ret)})</b></div>
    <div class="row"><span>Niezrealizowany</span><b>${sg(c.unreal,cur)}</b></div>
    <div class="row"><span>Zrealizowany (sprzedaże)</span><b>${sg(c.realized,cur)}</b></div>
    <div class="row"><span>Dywidendy</span><b>${money(c.divs,cur)}</b></div>
    <div class="row"><span>Opłaty osobne</span><b>${money(c.fees,cur)}</b></div>
-   ${c.miss.length?`<p class="bad">Brak kursu w arkuszu dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
+   ${c.miss.length?`<p class="bad">Brak kursu lub przelicznika waluty dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
    ${c.neg.length?`<p class="bad">Sprzedano więcej niż kupiono: ${c.neg.map(esc).join(", ")}. Sprawdź historię ruchów.</p>`:""}</div>`;
-  const pos=c.open.length?c.open.map(x=>`<div class="row"><span>${esc(x.sym)}<br><span class="mu">${fq(x.qty)} × śr. ${money(x.avg,cur)}</span></span><span style="text-align:right">${isNaN(x.price)?`<span class="mu">brak kursu</span>`:`<b>${money(x.value,cur)}</b><br>${sg(x.gain,cur)} (${pct(x.cost>0?x.gain/x.cost:NaN)})`}</span></div>`).join(""):`<p class="mu">Brak otwartych pozycji. Dodaj pierwszy zakup poniżej.</p>`;
-  const hist=S.tx.filter(t=>t.pid===p.id).sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1)).map(t=>`<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym||"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,cur)}`:money(t.amount,cur)}</span></button>`).join("");
-  const e=S.tx.find(x=>x.id===txEdit)||{type:"buy",date:today(),sym:"",qty:"",price:"",fee:"",amount:""};
-  const cash=e.type==="div"||e.type==="fee",v=x=>x===""||x==null||x===0?"":String(x).replace(".",",");
-  const form=`<div class="card"><b>${txEdit?"Edytuj ruch":"Dodaj ruch"}</b><p class="mu">Kwoty w walucie portfela (${esc(cur)}). Data może być wsteczna.</p>
+  const posHtml=c.open.length?c.open.map(x=>{const op=ui["pos:"+x.sym],xs=S.tx.filter(t=>t.pid===p.id&&t.sym===x.sym).sort(desc);
+    return `<div><button class="item" data-tog="pos:${esc(x.sym)}"><span>${esc(nm(x.sym))} ${op?"▲":"▼"}<br><span class="mu">${esc(x.sym)}, ${fq(x.qty)} × śr. ${money(x.avg,cur)}${x.ccy!==cur?` (${money(x.avgX,x.ccy)})`:""}</span></span><span style="text-align:right">${x.value==null?`<span class="mu">brak kursu</span>`:`<b>${money(x.value,cur)}</b><br>${sg(x.gain,cur)} (${pct(x.cost>0?x.gain/x.cost:NaN)})`}</span></button>
+     ${op?`<div class="sub"><button data-addtx="${esc(x.sym)}" style="width:100%;margin:6px 0">+ Dodaj ruch na ${esc(nm(x.sym))}</button>${xs.map(txItem).join("")}</div>`:""}</div>`}).join(""):`<p class="mu">Brak otwartych pozycji. Dodaj pierwszy zakup przyciskiem u góry.</p>`;
+  const allTx=S.tx.filter(t=>t.pid===p.id).sort(desc);
+  const histCard=allTx.length?`<button class="ghost" data-tog="hist" style="width:100%;margin-bottom:12px">Historia ruchów (${allTx.length}) ${ui.hist?"▲":"▼"}</button>${ui.hist?`<div class="card">${allTx.map(txItem).join("")}</div>`:""}`:"";
+  const e=S.tx.find(x=>x.id===txEdit)||{type:"buy",date:today(),sym:txSym,qty:"",price:"",fee:"",amount:"",fx:"",mg:"",tot:""};
+  const cash=e.type==="div"||e.type==="fee",v=x=>x===""||x==null||x===0?"":String(x).replace(".",","),X=ccyOf(e.sym)||cur,diff=X!==cur;
+  const list=Object.keys(quotes).filter(k=>!/^CURRENCY:/.test(k)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  if(e.sym&&!list.includes(e.sym))list.unshift(e.sym);
+  const rtNow=diff&&rt(X)&&rt(cur)?Math.round(rt(X)/rt(cur)*1e4)/1e4:"";
+  const txForm=`<div class="card"><b>${txEdit?"Edytuj ruch":"Dodaj ruch"}</b><p class="mu">Portfel w ${esc(cur)}. Data może być wsteczna.</p>
    <div class="g2"><div><label>Rodzaj</label><select id="t-type">${Object.keys(TL).map(k=>`<option value="${k}"${k===e.type?" selected":""}>${TL[k]}</option>`).join("")}</select></div>
    <div><label>Data</label><input id="t-date" type="date" value="${esc(e.date)}"></div></div>
-   <label>Symbol (jak w arkuszu, np. WSE:XTB)</label><input id="t-sym" list="syms" value="${esc(e.sym||"")}"><datalist id="syms">${Object.keys(quotes).map(k=>`<option value="${esc(k)}">`).join("")}</datalist>
-   <div id="t-trade" style="display:${cash?"none":""}"><div class="g2"><div><label>Ilość</label><input id="t-qty" inputmode="decimal" value="${v(e.qty)}"></div><div><label>Cena za sztukę</label><input id="t-price" inputmode="decimal" value="${v(e.price)}"></div></div>
-   <label>Prowizja (opcjonalnie)</label><input id="t-fee" inputmode="decimal" value="${v(e.fee)}"></div>
-   <div id="t-cash" style="display:${cash?"":"none"}"><label>Kwota (dywidenda netto albo opłata)</label><input id="t-amount" inputmode="decimal" value="${v(e.amount)}"></div>
-   <div class="g2"><button data-txsave>Zapisz ruch</button>${txEdit?`<button class="ghost" data-txcancel>Anuluj</button>`:"<span></span>"}</div>
-   ${txEdit?`<p><button class="danger" data-txdel>Usuń ten ruch</button></p>`:""}</div>`;
-  return sel+head+`<div class="card"><b>Pozycje</b>${pos}</div>`+form+(hist?`<div class="card"><b>Historia ruchów</b>${hist}</div>`:"")+newpf+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`}
+   <label>Papier</label><select id="t-sym"><option value="">${e.type==="fee"?"(opłata całego portfela)":"wybierz papier"}</option>${list.map(k=>`<option value="${esc(k)}"${k===e.sym?" selected":""}>${esc(nm(k))} (${esc(k)})</option>`).join("")}</select>
+   <div id="t-trade" style="display:${cash?"none":""}"><div class="g2"><div><label>Ilość</label><input id="t-qty" inputmode="decimal" value="${v(e.qty)}"></div><div><label id="t-pl">Cena za sztukę (${esc(X)})</label><input id="t-price" inputmode="decimal" value="${v(e.price)}"></div></div>
+   <div id="t-fxbox" style="display:${diff&&!cash?"":"none"}"><div class="g2"><div><label id="t-fxl">Kurs ${esc(X)}/${esc(cur)} z dnia ruchu</label><input id="t-fx" inputmode="decimal" placeholder="${rtNow?"dziś "+String(rtNow).replace(".",","):""}" value="${v(e.fx&&Math.abs(e.fx-1)>1e-7?e.fx:"")}"></div>
+   <div><label>Marża wymiany (%)</label><input id="t-mg" inputmode="decimal" value="${v(e.mg)}"></div></div>
+   <label>Kwota w ${esc(cur)} (opcjonalnie, zamiast przeliczania)</label><input id="t-tot" inputmode="decimal" value="${v(e.tot)}"><p class="mu" id="t-prev"></p></div>
+   <label>Prowizja w ${esc(cur)} (opcjonalnie)</label><input id="t-fee" inputmode="decimal" value="${v(e.fee)}"></div>
+   <div id="t-cash" style="display:${cash?"":"none"}"><label>Kwota w ${esc(cur)} (dywidenda netto albo opłata)</label><input id="t-amount" inputmode="decimal" value="${v(e.amount)}"></div>
+   <button data-txsave style="width:100%">Zapisz ruch</button>${txEdit?`<p><button class="danger" data-txdel>Usuń ten ruch</button></p>`:""}</div>`;
+  return top+sel+head+`<div class="card"><b>Pozycje</b>${posHtml}</div>`+histCard+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`+mod+(modal==="tx"?sheet(txForm):"")}
 
 document.addEventListener("change",e=>{
   if(e.target.matches("[data-pfsel]")){pid=e.target.value;txEdit=null;render()}
@@ -216,15 +241,17 @@ document.addEventListener("click",e=>{
     const id=String(Date.now());S.pf=[...S.pf,{id,name,owner:$("#p-owner").value,cur:$("#p-cur").value}];pid=id;save()}
   else if("delpf" in d){if(S.tx.some(x=>x.pid===pid)){alert("Ten portfel ma ruchy. Najpierw usuń je z historii.");return}
     if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);pid="all";save()}}
-  else if(d.txedit){txEdit=d.txedit;render();scrollTo(0,0)}
+  else if(d.txedit){txEdit=d.txedit;modal="tx";render()}
   else if("txcancel" in d){txEdit=null;render()}
   else if("txdel" in d){if(confirm("Usunąć ten ruch?")){S.tx=S.tx.filter(x=>x.id!==txEdit);txEdit=null;save()}}
   else if("txsave" in d){
-    const type=$("#t-type").value,date=$("#t-date").value,sym=$("#t-sym").value.trim().toUpperCase();
+    const type=$("#t-type").value,date=$("#t-date").value,sym=$("#t-sym").value.trim().toUpperCase(),pf=S.pf.find(x=>x.id===pid),cur=pf.cur;
     const qty=num($("#t-qty").value),price=num($("#t-price").value),fee=num($("#t-fee").value)||0,amount=num($("#t-amount").value);
-    const trade=type==="buy"||type==="sell";
-    if(!date||((trade||type==="div")&&!sym)||(trade&&!(qty>0&&price>=0))||(!trade&&!(amount>0))){alert("Uzupełnij datę, symbol oraz ilość i cenę (zakup, sprzedaż) albo kwotę (dywidenda, opłata).");return}
-    const rec={id:txEdit||String(Date.now()),pid,type,date,sym,qty:trade?qty:0,price:trade?price:0,fee:trade?fee:0,amount:trade?0:amount};
+    const fx=num($("#t-fx").value),mg=num($("#t-mg").value)||0,tot=num($("#t-tot").value);
+    const trade=type==="buy"||type==="sell",X=ccyOf(sym),diff=!!X&&X!==cur;
+    if(!date||((trade||type==="div")&&!sym)||(trade&&!(qty>0&&price>=0))||(!trade&&!(amount>0))){alert("Uzupełnij datę, papier oraz ilość i cenę (zakup, sprzedaż) albo kwotę (dywidenda, opłata).");return}
+    if(trade&&diff&&!(fx>0||tot>0)){alert("Ten papier jest w "+X+", a portfel w "+cur+". Podaj kurs "+X+"/"+cur+" z dnia ruchu albo całkowitą kwotę w "+cur+".");return}
+    const rec={id:txEdit||String(Date.now()),pid,type,date,sym,qty:trade?qty:0,price:trade?price:0,fee:trade?fee:0,amount:trade?0:amount,fx:trade&&diff&&fx>0?fx:1,mg:trade&&diff?mg:0,tot:trade&&diff&&tot>0?tot:0};
     S.tx=txEdit?S.tx.map(x=>x.id===txEdit?rec:x):[...S.tx,rec];txEdit=null;save()}});
 
 const BT={EDO:{y:10,cap:1,infl:1,fee:3},ROD:{y:12,cap:1,infl:1,fee:3},COI:{y:4,cap:0,infl:1,fee:2},ROS:{y:6,cap:0,infl:1,fee:2},TOS:{y:3,cap:1,infl:0,fee:1},DOR:{y:2,cap:0,infl:0,fee:0.7,mon:1},ROR:{y:1,cap:0,infl:0,fee:0.5,mon:1},OTS:{y:0.25,cap:0,infl:0,fee:0}};
@@ -263,9 +290,10 @@ function viewBnd(){
   const sum=`<div class="card"><div class="mu">Obligacje, wartość szacunkowa</div><div class="big">${money(bt.value,"PLN")}</div>
    <div class="row"><span>Wpłacono (bez wykupionych)</span><b>${money(bt.invested,"PLN")}</b></div>
    <div class="row"><span>Odsetki naliczone, niewypłacone (brutto)</span><b>${sg(bt.interest,"PLN")}</b></div>
-   ${miss.length?`<p class="bad">Brak inflacji za: ${miss.join(", ")}. Wpisz ją niżej. Na razie liczę tylko marżę, więc wartość jest zaniżona.</p>`:""}</div>`;
+   ${miss.length?`<p class="bad">Brakuje inflacji GUS za: ${miss.join(", ")}. Do czasu uzupełnienia liczę tylko marżę, więc wartość jest zaniżona.</p>`:""}</div>`;
   const items=list.length?list.map(({b,c})=>{const left=Math.ceil((c.end-D(today()))/864e5);
-    return `<button class="item" data-bedit="${esc(b.id)}"><span>${esc(b.name||b.type)} (${b.type}), ${fq(b.qty)} szt.<br><span class="mu">${esc(b.owner)}, kupno ${esc(b.date)}<br>wykup ${dd(c.end)} ${c.matured?"(termin minął, usuń po wypłacie)":"(za "+left+" dni)"}${c.nextPay&&!b.cap&&!c.matured?`<br>najbliższa wypłata odsetek: ${dd(c.nextPay)}`:""}<br>oprocentowanie w kolejnych latach: ${c.rates.map((r,i)=>(i+1)+": "+fp(r)).join(", ")}</span></span><span style="text-align:right"><b>${money(c.value,"PLN")}</b><br>${sg(c.interest,"PLN")}<br><span class="mu">${b.cap?"odsetki":"od ostatniej wypłaty"}<br>${b.cap?"netto przy wykupie dziś":"netto po podatku"} ${money(c.net,"PLN")}</span></span></button>`}).join(""):`<p class="mu">Nie ma jeszcze obligacji. Dodaj pierwszą poniżej.</p>`;
+    return `<div><button class="item" data-bedit="${esc(b.id)}"><span>${esc(b.name||b.type)} (${b.type}), ${fq(b.qty)} szt.<br><span class="mu">${esc(b.owner)}, kupno ${esc(b.date)}<br>wykup ${dd(c.end)} ${c.matured?"(termin minął, usuń po wypłacie)":"(za "+left+" dni)"}${c.nextPay&&!b.cap&&!c.matured?`<br>najbliższa wypłata odsetek: ${dd(c.nextPay)}`:""}<br>oprocentowanie w kolejnych latach: ${c.rates.map((r,i)=>(i+1)+": "+fp(r)).join(", ")}</span></span><span style="text-align:right"><b>${money(c.value,"PLN")}</b><br>${sg(c.interest,"PLN")}<br><span class="mu">${b.cap?"odsetki":"od ostatniej wypłaty"}<br>${b.cap?"netto przy wykupie dziś":"netto po podatku"} ${money(c.net,"PLN")}</span></span></button>
+     ${c.miss.length&&!c.matured?`<button class="ghost" data-cpimiss="${esc(c.miss[0])}" style="margin:2px 0 10px">Dodaj brakującą inflację (za ${esc(c.miss[0])})</button>`:""}</div>`}).join(""):`<p class="mu">Nie ma jeszcze obligacji.</p>`;
   const e=S.bonds.find(x=>x.id===bEdit)||{type:"EDO",name:"",owner:OWNERS[0],date:today(),qty:"",r1:"",margin:"",years:10,cap:1,infl:1,fee:3};
   const form=`<div class="card"><b>${bEdit?"Edytuj obligacje":"Dodaj obligacje"}</b><p class="mu">Dane z potwierdzenia zakupu. Jedna sztuka to 100 zł. Lata, sposób naliczania i opłatę sprawdź w warunkach swojej serii. Przy obligacjach o zmiennej stopie (DOR, ROR) wpisz aktualne oprocentowanie, liczę je jako stałe.</p>
    <div class="g2"><div><label>Rodzaj</label><select id="b-type">${Object.keys(BT).map(k=>`<option${k===e.type?" selected":""}>${k}</option>`).join("")}</select></div>
@@ -279,13 +307,13 @@ function viewBnd(){
    <div class="g2"><div><label>Czas trwania (lata)</label><input id="b-years" inputmode="decimal" value="${vv(e.years)}"></div>
    <div><label>Odsetki</label><select id="b-cap"><option value="1"${e.cap?" selected":""}>kapitalizowane (doliczane)</option><option value="0"${e.cap?"":" selected"}>wypłacane (co rok / miesiąc)</option></select></div></div>
    <label>Opłata za wcześn. wykup (zł/szt.)</label><input id="b-fee" inputmode="decimal" value="${vv(e.fee)}">
-   <div class="g2"><button data-bsave>Zapisz</button>${bEdit?`<button class="ghost" data-bcancel>Anuluj</button>`:"<span></span>"}</div>
-   ${bEdit?`<p><button class="danger" data-bdel>Usuń obligacje</button></p>`:""}</div>`;
-  const cpi=`<div class="card"><b>Inflacja GUS (r/r)</b><p class="mu">Od 2. roku oprocentowanie = inflacja + marża. Dla okresu zaczynającego się w danym miesiącu bierze się inflację ogłoszoną miesiąc wcześniej, czyli za miesiąc sprzed ${LAG} miesięcy (np. okres od czerwca: inflacja za kwiecień).</p>
-   <div class="g2"><div><label>Miesiąc inflacji</label><input id="c-m" type="month" value="${miss[0]||""}"></div><div><label>Inflacja (%)</label><input id="c-v" inputmode="decimal"></div></div>
-   <button data-cpisave>Zapisz inflację</button>
+   <button data-bsave style="width:100%">Zapisz</button>${bEdit?`<p><button class="danger" data-bdel>Usuń obligacje</button></p>`:""}</div>`;
+  const cpiForm=`<div class="card"><b>Inflacja GUS (r/r)</b><p class="mu">Wpis dotyczy wszystkich obligacji naraz, więc wystarczy wpisać go raz. Od 2. roku oprocentowanie = inflacja + marża. Dla okresu zaczynającego się w danym miesiącu bierze się inflację za miesiąc sprzed ${LAG} miesięcy (np. okres od czerwca: inflacja za kwiecień).</p>
+   <label>Miesiąc inflacji</label><input id="c-m" type="month" value="${esc(cpiKey||miss[0]||"")}">
+   <label>Inflacja (%)</label><input id="c-v" inputmode="decimal">
+   <button data-cpisave style="width:100%">Zapisz inflację</button>
    ${[...S.infl].sort((a,b)=>a.m<b.m?1:-1).map(i=>`<button class="item" data-cpidel="${esc(i.m)}"><span>${esc(i.m)}</span><b>${fp(i.v)}</b></button>`).join("")}</div>`;
-  return sum+`<div class="card">${items}</div>`+form+cpi}
+  return `<div class="g2" style="margin-bottom:12px"><button data-open="bond">+ Dodaj obligację</button><button class="ghost" data-open="cpi">Inflacja GUS</button></div>`+sum+`<div class="card">${items}</div>`+(modal==="bond"?sheet(form):"")+(modal==="cpi"?sheet(cpiForm):"")}
 
 function ppkCalc(){const P=S.ppk,price=P.price||0,src={own:{u:0,c:0},emp:{u:0,c:0},state:{u:0,c:0}};
   for(const e of P.e){const q=src[e.src];if(q){q.u+=e.units;q.c+=e.amount}}
@@ -301,7 +329,8 @@ function viewPpk(){const P=S.ppk,c=ppkCalc();
    <div class="row"><span>Wynik</span><b>${sg(c.gain,"PLN")} (${pct(c.ret)})</b></div>
    <div class="row"><span>Jednostki</span><b>${fq(c.units)}</b></div>
    ${P.price>0?"":`<p class="bad">Wpisz kurs jednostki, żeby zobaczyć wartość.</p>`}
-   <label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu"><label>Kurs jednostki (zł)${P.pdate?", z dnia "+esc(P.pdate):""}</label><div class="g2"><input id="pp-price" inputmode="decimal" value="${vv(P.price||"")}"><input id="pp-date" type="date" value="${esc(P.pdate||today())}"></div>
+   <label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu">
+   <label>Kurs jednostki (zł)${P.pdate?", z dnia "+esc(P.pdate):""}</label><div class="g2"><input id="pp-price" inputmode="decimal" value="${vv(P.price||"")}"><input id="pp-date" type="date" value="${esc(P.pdate||today())}"></div>
    <button data-ppsave>Zapisz kurs</button></div>`;
   const by=`<div class="card"><div class="mu">Podział wg źródła</div>${Object.keys(SRC).map(k=>`<div class="row"><span>${SRC[k]}<br><span class="mu">wpłacono ${money(c.src[k].c,"PLN")}, ${fq(c.src[k].u)} jedn.</span></span><b>${money(c.src[k].v,"PLN")}</b></div>`).join("")}</div>`;
   const calc=`<div class="card"><b>Gdybym wypłacił dziś przed 60. rokiem życia</b>
@@ -317,12 +346,10 @@ function viewPpk(){const P=S.ppk,c=ppkCalc();
    <div><label>Źródło</label><select id="pe-src">${Object.keys(SRC).map(k=>`<option value="${k}"${k===e.src?" selected":""}>${SRC[k]}</option>`).join("")}</select></div></div>
    <div class="g2"><div><label>Kwota (zł)</label><input id="pe-amount" inputmode="decimal" value="${vv(e.amount)}"></div>
    <div><label>Liczba jednostek</label><input id="pe-units" inputmode="decimal" value="${vv(e.units)}"></div></div>
-   <div class="g2"><button data-pesave>Zapisz wpłatę</button>${peEdit?`<button class="ghost" data-pecancel>Anuluj</button>`:"<span></span>"}</div>
-   ${peEdit?`<p><button class="danger" data-pedel>Usuń wpłatę</button></p>`:""}</div>
-   `;
+   <button data-pesave style="width:100%">Zapisz wpłatę</button>${peEdit?`<p><button class="danger" data-pedel>Usuń wpłatę</button></p>`:""}</div>`;
   const rows=[...P.e].sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1));
-  const hist=rows.length?`<div class="card"><b>Wpłaty (ostatnie 30 z ${rows.length})</b>${rows.slice(0,30).map(x=>`<button class="item" data-peedit="${esc(x.id)}"><span>${esc(x.date)}<br><span class="mu">${SRC[x.src]}</span></span><span style="text-align:right"><b>${money(x.amount,"PLN")}</b><br><span class="mu">${fq(x.units)} jedn.</span></span></button>`).join("")}</div>`:"";
-  return top+by+calc+form+hist}
+  const hist=rows.length?`<button class="ghost" data-tog="pph" style="width:100%;margin-bottom:12px">Historia wpłat (${rows.length}) ${ui.pph?"▲":"▼"}</button>${ui.pph?`<div class="card">${rows.map(x=>`<button class="item" data-peedit="${esc(x.id)}"><span>${esc(x.date)}<br><span class="mu">${SRC[x.src]}</span></span><span style="text-align:right"><b>${money(x.amount,"PLN")}</b><br><span class="mu">${fq(x.units)} jedn.</span></span></button>`).join("")}</div>`:""}`:"";
+  return top+by+calc+`<button data-open="ppe" style="width:100%;margin-bottom:12px">+ Dodaj wpłatę</button>`+hist+(modal==="ppe"?sheet(form):"")}
 
 document.addEventListener("change",e=>{
   if(e.target.id==="b-type"){const t=BT[e.target.value];$("#b-years").value=vv(t.y);$("#b-cap").value=t.cap;$("#b-infl").value=t.infl;$("#b-fee").value=vv(t.fee)}});
@@ -330,7 +357,7 @@ document.addEventListener("change",e=>{
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-bak],[data-bedit],[data-bsave],[data-bcancel],[data-bdel],[data-cpisave],[data-cpidel],[data-ppsave],[data-pesave],[data-peedit],[data-pecancel],[data-pedel]");if(!t)return;const d=t.dataset;
   if("bak" in d){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download="portfel-kopia-"+today()+".json";a.click()}
-  else if(d.bedit){bEdit=d.bedit;render();scrollTo(0,document.body.scrollHeight)}
+  else if(d.bedit){bEdit=d.bedit;modal="bond";render()}
   else if("bcancel" in d){bEdit=null;render()}
   else if("bdel" in d){if(confirm("Usunąć te obligacje?")){S.bonds=S.bonds.filter(x=>x.id!==bEdit);bEdit=null;save()}}
   else if("bsave" in d){const date=$("#b-date").value,qty=num($("#b-qty").value),r1=num($("#b-r1").value),margin=num($("#b-margin").value)||0,years=num($("#b-years").value),fee=num($("#b-fee").value)||0;
@@ -343,13 +370,29 @@ document.addEventListener("click",e=>{
   else if("ppsave" in d){const price=num($("#pp-price").value),fund=$("#pp-fund").value.trim();
     if(!(price>0)&&!fund){alert("Wpisz kurs jednostki lub nazwę funduszu.");return}
     S.ppk={...S.ppk,fund,price:price>0?price:S.ppk.price,pdate:price>0?$("#pp-date").value:S.ppk.pdate};save()}
-  else if(d.peedit){peEdit=d.peedit;render();scrollTo(0,document.body.scrollHeight)}
+  else if(d.peedit){peEdit=d.peedit;modal="ppe";render()}
   else if("pecancel" in d){peEdit=null;render()}
   else if("pedel" in d){if(confirm("Usunąć tę wpłatę?")){S.ppk={...S.ppk,e:S.ppk.e.filter(x=>x.id!==peEdit)};peEdit=null;save()}}
   else if("pesave" in d){const date=$("#pe-date").value,amount=num($("#pe-amount").value),units=num($("#pe-units").value);
     if(!date||!(amount>0)||!(units>0)){alert("Uzupełnij datę, kwotę i liczbę jednostek.");return}
     const rec={id:peEdit||String(Date.now()),date,src:$("#pe-src").value,amount,units};
     S.ppk={...S.ppk,e:peEdit?S.ppk.e.map(x=>x.id===peEdit?rec:x):[...S.ppk.e,rec]};peEdit=null;save()}});
+
+const fxSync=()=>{const sel=$("#t-sym"),box=$("#t-fxbox"),p=S.pf.find(x=>x.id===pid);if(!sel||!box||!p)return;
+  const X=ccyOf(sel.value)||p.cur,diff=X!==p.cur,cash=["div","fee"].includes($("#t-type").value);
+  box.style.display=diff&&!cash?"":"none";$("#t-pl").textContent="Cena za sztukę ("+X+")";$("#t-fxl").textContent="Kurs "+X+"/"+p.cur+" z dnia ruchu";
+  const q=num($("#t-qty").value),pr=num($("#t-price").value),f=num($("#t-fx").value),m=num($("#t-mg").value)||0,tot=num($("#t-tot").value);
+  $("#t-prev").textContent=diff&&q>0&&pr>=0&&(f>0||tot>0)?"Koszt w "+p.cur+": "+money(tot>0?tot:q*pr*f*(1+m/100),p.cur):""};
+document.addEventListener("input",e=>{if(["t-qty","t-price","t-fx","t-mg","t-tot"].includes(e.target.id))fxSync()});
+document.addEventListener("change",e=>{if(["t-sym","t-type"].includes(e.target.id))fxSync()});
+document.addEventListener("click",e=>{
+  if(e.target.classList&&e.target.classList.contains("ov")){modal=null;editId=txEdit=bEdit=peEdit=null;render();return}
+  const t=e.target.closest("[data-open],[data-close],[data-tog],[data-addtx],[data-cpimiss]");if(!t)return;const d=t.dataset;
+  if("close" in d){modal=null;editId=txEdit=bEdit=peEdit=null;render()}
+  else if(d.open){modal=d.open;editId=txEdit=bEdit=peEdit=null;txSym="";cpiKey="";render()}
+  else if(d.tog){ui[d.tog]=!ui[d.tog];render()}
+  else if(d.addtx){txSym=d.addtx;txEdit=null;modal="tx";render()}
+  else if(d.cpimiss){cpiKey=d.cpimiss;modal="cpi";render()}});
 
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
@@ -372,8 +415,8 @@ document.addEventListener("submit",async e=>{
 
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-tab],[data-edit],[data-save],[data-cancel],[data-del],[data-out]");if(!t)return;
-  if(t.dataset.tab){tab=t.dataset.tab;editId=null;render()}
-  else if(t.dataset.edit){editId=t.dataset.edit;render();scrollTo(0,document.body.scrollHeight)}
+  if(t.dataset.tab){tab=t.dataset.tab;editId=null;modal=null;render()}
+  else if(t.dataset.edit){editId=t.dataset.edit;modal="acc";render()}
   else if("cancel" in t.dataset){editId=null;render()}
   else if("out" in t.dataset){signOut(auth)}
   else if("del" in t.dataset){if(confirm("Usunąć to konto z listy?")){S.accounts=S.accounts.filter(x=>x.id!==editId);editId=null;save()}}
