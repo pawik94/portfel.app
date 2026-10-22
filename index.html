@@ -67,7 +67,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 const num=s=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:NaN};
 const money=(v,c)=>{try{return new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){return v.toFixed(2)+" "+c}};
 
-let user=null,S={accounts:[],pf:[],tx:[],bonds:[],infl:[],ppk:{price:0,pdate:"",e:[]}},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
+let user=null,S={accounts:[],pf:[],tx:[],bonds:[],infl:[],ppk:{price:0,pdate:"",e:[]},dep:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
 
 function parseCsv(t){const rows=[];let r=[],f="",q=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -82,7 +82,7 @@ function applyRows(rows){rates={PLN:1};quotes={};
   for(const r of rows){const s=r[0];if(!s)continue;const four=r.length>=4,name=four?r[1]:"",k=four?r[2]:r[1],w=four?r[3]:r[2];
     const m=s.match(/^CURRENCY:([A-Z]{3})PLN$/);
     if(m){const n=num(k);if(n>0)rates[m[1]]=n}
-    else quotes[s]={name:name||s,price:num(k),fx:num(w)}}}
+    else quotes[s]={sym:s,raw:k,name:name||s,price:num(k),fx:num(w)}}}
 
 async function loadRates(){
   try{const res=await fetch(CSV_URL,{cache:"no-store"});if(!res.ok)throw new Error("http");
@@ -95,7 +95,7 @@ async function loadRates(){
   render()}
 
 async function save(){modal=null;
-  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx,bonds:S.bonds,infl:S.infl,ppk:S.ppk},{merge:true});err=""}
+  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx,bonds:S.bonds,infl:S.infl,ppk:S.ppk,dep:S.dep},{merge:true});err=""}
   catch(e){err="Nie zapisano: "+e.code}
   render()}
 
@@ -116,10 +116,13 @@ function donut(parts){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return 
     off-=q;cum+=q}
   return `<svg viewBox="0 0 42 42" role="img" aria-label="Podział aktywów" style="width:240px;max-width:75%;display:block;margin:0 auto 10px">${segs}${lab}</svg>`}
 
-function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pv=ppkCalc().value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
+function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pk=ppkCalc(),pv=pk.value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
   const parts=[{n:"Oszczędności i konta",v:sv,c:"--c1"},{n:"Akcje",v:sk.pln,c:"--c2"},{n:"Obligacje",v:bt.value,c:"--c3"},{n:"PPK",v:pv,c:"--c4"}];
   const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+" %":"–";
+  const own=pk.src.own.c,gAll=sk.gain+(bt.value-bt.invOwn)+(pv-own),bAll=sk.base+bt.invOwn+own,fAll=[sk.first,bt.firstOwn,pk.first].filter(Boolean).sort()[0]||"";
   return `<div class="card"><div class="mu">Razem</div><div class="big">${money(total,"PLN")}</div>${warn({miss:[...new Set([...tt.miss,...sk.miss])]})}</div>
+  <div class="card"><div class="mu">Inwestycje razem, od moich wpłat</div><div class="row"><span>Wynik</span><b>${sg(gAll,"PLN")}</b></div>${fAll&&bAll>0?retRows(gAll/bAll,fAll):""}
+   <p class="mu">Podstawą są Twoje wpłaty: do portfeli akcji, obligacje kupione z własnych środków i własne wpłaty do PPK. Reinwestowane odsetki oraz wpłaty pracodawcy i państwa liczą się jako zysk.</p></div>
   <div class="card">${donut(parts)}${parts.map(x=>`<div class="row"><span><i class="dot" style="background:var(${x.c})"></i>${x.n}</span><b>${money(x.v,"PLN")} <span class="mu">${pc(x.v)}</span></b></div>`).join("")}</div>
   <div class="g2"><button class="ghost" data-bak>Kopia danych</button><button class="ghost" data-out>Wyloguj</button></div>`}
 
@@ -144,21 +147,21 @@ const sg=(v,c)=>`<span class="${v<0?"bad":v>0?"good":""}">${v>0?"+":""}${money(v
 const fq=n=>String(Math.round(n*1e6)/1e6).replace(".",",");
 const TL={buy:"Zakup",sell:"Sprzedaż",div:"Dywidenda",fee:"Opłata"};
 
-let modal=null,ui={},txSym="",cpiKey="";
+let modal=null,ui={},txSym="",cpiKey="",depEdit=null;
 const sheet=h=>`<div class="ov"><div class="sh"><div style="text-align:right"><button class="ghost" data-close>Zamknij</button></div>${h}</div></div>`;
 const nm=x=>quotes[x]?quotes[x].name:x;
 const rt=c=>c==="PLN"?1:rates[c];
 function ccyOf(sym){const q=quotes[sym];if(!q||!(q.fx>0))return null;if(Math.abs(q.fx-1)<1e-9)return "PLN";for(const c in rates)if(c!=="PLN"&&Math.abs(rates[c]/q.fx-1)<0.003)return c;return null}
 const effFx=t=>{const f=t.fx>0?t.fx:1,m=(t.mg||0)/100;return t.type==="sell"?f*(1-m):f*(1+m)};
 
-function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0,first="";
+function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0,first="",sold=0;
   const txs=S.tx.filter(t=>t.pid===p.id).sort((a,b)=>a.date===b.date?(a.id<b.id?-1:1):(a.date<b.date?-1:1));
   for(const t of txs){
     if(!t.sym){fees+=t.amount||0;continue}
     const P=pos[t.sym]||(pos[t.sym]={sym:t.sym,qty:0,cost:0,costX:0});
     if(t.type==="buy"){const c=(t.tot>0?t.tot:t.qty*t.price*effFx(t))+(t.fee||0);P.qty+=t.qty;P.cost+=c;P.costX+=t.qty*t.price;buys+=c;if(!first||t.date<first)first=t.date;if(!P.first||t.date<P.first)P.first=t.date}
     else if(t.type==="sell"){const avg=P.qty>0?P.cost/P.qty:0,avgX=P.qty>0?P.costX/P.qty:0,pr=(t.tot>0?t.tot:t.qty*t.price*effFx(t))-(t.fee||0);
-      realized+=pr-t.qty*avg;P.cost-=t.qty*avg;P.costX-=t.qty*avgX;P.qty-=t.qty}
+      realized+=pr-t.qty*avg;sold+=pr;P.cost-=t.qty*avg;P.costX-=t.qty*avgX;P.qty-=t.qty}
     else if(t.type==="div")divs+=t.amount||0;
     else if(t.type==="fee")fees+=t.amount||0}
   const open=[],miss=[],neg=[];let value=0,unreal=0;
@@ -170,25 +173,39 @@ function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0,first="";
     open.push(P)}
   const gain=unreal+realized+divs-fees;
   const f=rates[p.cur]||open.map(x=>quotes[x.sym]&&quotes[x.sym].fx).find(v=>v>0);
-  return{open,miss,neg,value,unreal,realized,divs,fees,gain,buys,first,ret:buys>0?gain/buys:NaN,f}}
+  const dep=depInfo(p);let gainD=NaN,gainDPLN=NaN,retD=NaN;
+  if(dep.dP>0){const cash=dep.dP-buys+sold+divs-fees,eq=value+Math.max(cash,0);gainD=eq-dep.dP;if(f){gainDPLN=eq*f-dep.dPLN;retD=gainDPLN/dep.dPLN}}
+  return{open,miss,neg,value,unreal,realized,divs,fees,gain,buys,first,ret:buys>0?gain/buys:NaN,f,dep,gainD,gainDPLN,retD}}
 
-function stkTotals(){let pln=0;const by={},miss=new Set();
-  for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
-    pln+=c.value*c.f;by[p.owner]=(by[p.owner]||0)+c.value*c.f}
-  return{pln,by,miss:[...miss]}}
+function depInfo(p){let dP=0,dPLN=0,first="";
+  for(const d of S.dep.filter(x=>x.pid===p.id)){const f=d.fx>0?d.fx:1,a=d.amount;let P,PLN;
+    if(d.cur===p.cur){P=a;PLN=d.cur==="PLN"?a:a*f}
+    else if(d.cur==="PLN"){PLN=a;P=a/f}
+    else if(p.cur==="PLN"){P=a*f;PLN=P}
+    else continue;
+    dP+=P;dPLN+=PLN;if(!first||d.date<first)first=d.date}
+  return{dP,dPLN,first}}
 
-function stkAll(){let h="",pln=0,gain=0,buys=0,first="";const miss=new Set();
+function stkTotals(){let pln=0,gain=0,base=0,first="";const by={},miss=new Set();
   for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
-    pln+=c.value*c.f;gain+=c.gain*c.f;buys+=c.buys*c.f;if(c.first&&(!first||c.first<first))first=c.first;
-    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(c.gain*c.f,"PLN")} (${pct(c.ret)})</span></button>`}
+    const u=c.dep.dP>0,fd=u?c.dep.first:c.first;
+    pln+=c.value*c.f;gain+=u?c.gainDPLN:c.gain*c.f;base+=u?c.dep.dPLN:c.buys*c.f;if(fd&&(!first||fd<first))first=fd;
+    by[p.owner]=(by[p.owner]||0)+c.value*c.f}
+  return{pln,gain,base,first,by,miss:[...miss]}}
+
+function stkAll(){let h="",pln=0,gain=0,base=0,first="";const miss=new Set();
+  for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
+    const u=c.dep.dP>0,g=u?c.gainDPLN:c.gain*c.f,b=u?c.dep.dPLN:c.buys*c.f,fd=u?c.dep.first:c.first,r=u?c.retD:c.ret;
+    pln+=c.value*c.f;gain+=g;base+=b;if(fd&&(!first||fd<first))first=fd;
+    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(g,"PLN")} (${pct(r)})</span></button>`}
   return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(pln,"PLN")}</div>
-   <div class="row"><span>Wynik łącznie</span><b>${sg(gain,"PLN")}</b></div>${first?retRows(buys>0?gain/buys:NaN,first):""}
+   <div class="row"><span>Wynik łącznie</span><b>${sg(gain,"PLN")}</b></div>${first?retRows(base>0?gain/base:NaN,first):""}
    ${miss.size?`<p class="bad">Brak kursu do PLN dla: ${[...miss].map(esc).join(", ")}. Te portfele nie są wliczone.</p>`:""}</div><div class="card">${h}</div>`}
 
 function viewStk(){
   if(!S.pf.length)pid="";else if(pid==="all"&&S.pf.length===1)pid=S.pf[0].id;else if(pid!=="all"&&!S.pf.find(p=>p.id===pid))pid="all";
   const one=pid&&pid!=="all";
-  const top=`<div class="g2" style="margin-bottom:12px"><button data-open="pf">+ Nowy portfel</button>${one?`<button data-open="tx">+ Dodaj ruch</button>`:"<span></span>"}</div>`;
+  const top=`<div class="g2" style="margin-bottom:12px"><button data-open="pf">+ Nowy portfel</button>${one?`<button data-open="dep">+ Dodaj wpłatę</button>`:"<span></span>"}</div>${one?`<button data-open="tx" style="width:100%;margin-bottom:12px">+ Dodaj ruch</button>`:""}`;
   const pfForm=`<div class="card"><b>Nowy portfel</b><label>Nazwa</label><input id="p-name" placeholder="np. IKE">
    <div class="g2"><div><label>Właściciel</label><select id="p-owner">${OWNERS.map(o=>`<option>${o}</option>`).join("")}</select></div>
    <div><label>Waluta portfela</label><select id="p-cur">${CURS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
@@ -200,8 +217,10 @@ function viewStk(){
   const p=S.pf.find(x=>x.id===pid),c=calc(p),cur=p.cur;
   const desc=(a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1);
   const txItem=t=>{const X=ccyOf(t.sym)||cur;return `<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym?nm(t.sym):"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,X)}${t.fx>0&&Math.abs(t.fx-1)>1e-7?`<br><span class="mu">kurs ${vv(t.fx)}${t.mg?`, marża ${vv(t.mg)}%`:""}</span>`:""}`:money(t.amount,cur)}</span></button>`};
+  const useD=c.dep.dP>0,gT=useD?c.gainD:c.gain,rT=useD?c.retD:c.ret,fT=useD?c.dep.first:c.first;
   const head=`<div class="card"><div class="mu">Wartość portfela</div><div class="big">${money(c.value,cur)}</div>${cur!=="PLN"&&c.f?`<div class="mu">≈ ${money(c.value*c.f,"PLN")}</div>`:""}
-   <div class="row"><span>Wynik łącznie</span><b>${sg(c.gain,cur)}</b></div>${c.first?retRows(c.ret,c.first):""}
+   <div class="row"><span>Wynik łącznie</span><b>${sg(gT,cur)}${useD&&cur!=="PLN"&&!isNaN(c.gainDPLN)?`<br><span class="mu">${sg(c.gainDPLN,"PLN")} w PLN</span>`:""}</b></div>${fT?retRows(rT,fT,useD?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
+   ${useD?"":`<p class="mu">Dodaj wpłaty do portfela, żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów (w których są reinwestowane zyski).</p>`}
    ${c.miss.length?`<p class="bad">Brak kursu lub przelicznika waluty dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
    ${c.neg.length?`<p class="bad">Sprzedano więcej niż kupiono: ${c.neg.map(esc).join(", ")}. Sprawdź historię ruchów.</p>`:""}</div>`;
   const posHtml=c.open.length?c.open.map(x=>{const op=ui["pos:"+x.sym],xs=S.tx.filter(t=>t.pid===p.id&&t.sym===x.sym).sort(desc);
@@ -209,9 +228,17 @@ function viewStk(){
      ${op?`<div class="sub">${x.value!=null&&x.cost>0&&x.first?retRows(x.gain/x.cost,x.first,"Stopa zwrotu pozycji"):""}<button data-addtx="${esc(x.sym)}" style="width:100%;margin:6px 0">+ Dodaj ruch na ${esc(nm(x.sym))}</button>${xs.map(txItem).join("")}</div>`:""}</div>`}).join(""):`<p class="mu">Brak otwartych pozycji. Dodaj pierwszy zakup przyciskiem u góry.</p>`;
   const allTx=S.tx.filter(t=>t.pid===p.id).sort(desc);
   const histCard=allTx.length?`<button class="ghost" data-tog="hist" style="width:100%;margin-bottom:12px">Historia ruchów (${allTx.length}) ${ui.hist?"▲":"▼"}</button>${ui.hist?`<div class="card">${allTx.map(txItem).join("")}</div>`:""}`:"";
+  const de=S.dep.find(x=>x.id===depEdit)||{date:today(),amount:"",cur:cur,fx:""},dX=de.cur!=="PLN"?de.cur:(cur!=="PLN"?cur:null);
+  const depForm=`<div class="card"><b>${depEdit?"Edytuj wpłatę":"Dodaj wpłatę do portfela"}</b><p class="mu">Wpłaty służą do liczenia stopy zwrotu (zakupy zawierają reinwestowane zyski). Kurs podaj jako ile PLN za 1 jednostkę waluty obcej.</p>
+   <div class="g2"><div><label>Data</label><input id="d-date" type="date" value="${esc(de.date)}"></div><div><label>Kwota</label><input id="d-amount" inputmode="decimal" value="${vv(de.amount)}"></div></div>
+   <div class="g2"><div><label>Waluta wpłaty</label><select id="d-cur">${[...new Set([cur,"PLN",...CURS,de.cur])].map(k=>`<option${k===de.cur?" selected":""}>${k}</option>`).join("")}</select></div>
+   <div id="d-fxbox" style="display:${dX?"":"none"}"><label id="d-fxl">Kurs z dnia wpłaty (PLN za 1 ${esc(dX||"")})</label><input id="d-fx" inputmode="decimal" value="${vv(de.fx&&Math.abs(de.fx-1)>1e-7?de.fx:"")}"></div></div>
+   <button data-depsave style="width:100%">Zapisz wpłatę</button>${depEdit?`<p><button class="danger" data-depdel>Usuń wpłatę</button></p>`:""}</div>`;
+  const deps=S.dep.filter(x=>x.pid===p.id).sort(desc);
+  const depHist=deps.length?`<button class="ghost" data-tog="deps" style="width:100%;margin-bottom:12px">Wpłaty do portfela (${deps.length}) ${ui.deps?"▲":"▼"}</button>${ui.deps?`<div class="card">${deps.map(x=>`<button class="item" data-depedit="${esc(x.id)}"><span>${esc(x.date)}</span><span style="text-align:right">${money(x.amount,x.cur)}${x.cur!==cur&&x.fx>0?`<br><span class="mu">kurs ${vv(x.fx)}</span>`:""}</span></button>`).join("")}</div>`:""}`:"";
   const e=S.tx.find(x=>x.id===txEdit)||{type:"buy",date:today(),sym:txSym,qty:"",price:"",fee:"",amount:"",fx:"",mg:"",tot:""};
   const cash=e.type==="div"||e.type==="fee",v=x=>x===""||x==null||x===0?"":String(x).replace(".",","),X=ccyOf(e.sym)||cur,diff=X!==cur;
-  const list=Object.keys(quotes).filter(k=>!/^CURRENCY:/.test(k)).sort((a,b)=>nm(a).localeCompare(nm(b)));
+  const list=Object.keys(quotes).filter(k=>!/^CURRENCY:|^PPK/i.test(k)).sort((a,b)=>nm(a).localeCompare(nm(b)));
   if(e.sym&&!list.includes(e.sym))list.unshift(e.sym);
   const rtNow=diff&&rt(X)&&rt(cur)?Math.round(rt(X)/rt(cur)*1e4)/1e4:"";
   const txForm=`<div class="card"><b>${txEdit?"Edytuj ruch":"Dodaj ruch"}</b><p class="mu">Portfel w ${esc(cur)}. Data może być wsteczna.</p>
@@ -225,7 +252,7 @@ function viewStk(){
    <label>Prowizja w ${esc(cur)} (opcjonalnie)</label><input id="t-fee" inputmode="decimal" value="${v(e.fee)}"></div>
    <div id="t-cash" style="display:${cash?"":"none"}"><label>Kwota w ${esc(cur)} (dywidenda netto albo opłata)</label><input id="t-amount" inputmode="decimal" value="${v(e.amount)}"></div>
    <button data-txsave style="width:100%">Zapisz ruch</button>${txEdit?`<p><button class="danger" data-txdel>Usuń ten ruch</button></p>`:""}</div>`;
-  return top+sel+head+`<div class="card"><b>Pozycje</b>${posHtml}</div>`+histCard+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`+mod+(modal==="tx"?sheet(txForm):"")}
+  return top+sel+head+`<div class="card"><b>Pozycje</b>${posHtml}</div>`+depHist+histCard+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`+mod+(modal==="tx"?sheet(txForm):"")+(modal==="dep"?sheet(depForm):"")}
 
 document.addEventListener("change",e=>{
   if(e.target.matches("[data-pfsel]")){pid=e.target.value;txEdit=null;render()}
@@ -237,7 +264,7 @@ document.addEventListener("click",e=>{
   else if("addpf" in d){const name=$("#p-name").value.trim();if(!name){alert("Wpisz nazwę portfela.");return}
     const id=String(Date.now());S.pf=[...S.pf,{id,name,owner:$("#p-owner").value,cur:$("#p-cur").value}];pid=id;save()}
   else if("delpf" in d){if(S.tx.some(x=>x.pid===pid)){alert("Ten portfel ma ruchy. Najpierw usuń je z historii.");return}
-    if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);pid="all";save()}}
+    if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);S.dep=S.dep.filter(x=>x.pid!==pid);pid="all";save()}}
   else if(d.txedit){txEdit=d.txedit;modal="tx";render()}
   else if("txcancel" in d){txEdit=null;render()}
   else if("txdel" in d){if(confirm("Usunąć ten ruch?")){S.tx=S.tx.filter(x=>x.id!==txEdit);txEdit=null;save()}}
@@ -287,9 +314,10 @@ function bondCalc(b){const now=D(today()),P=100*b.qty,M=Math.round(b.years*12),e
   const tot=b.cap?(C+acc-P)/P:sr/100,an=b.cap?ann(tot,b.date):(el>=365?tot/(el/365):NaN);
   return{P,value:(b.cap?C:P)+acc,interest,net,rates,miss,end,matured,nextPay,tot,an}}
 
-function bondTotals(){let value=0,invested=0,interest=0;const by={};
-  for(const b of S.bonds){const c=bondCalc(b);if(c.matured)continue;value+=c.value;invested+=c.P;interest+=c.interest;by[b.owner]=(by[b.owner]||0)+c.value}
-  return{value,invested,interest,by}}
+function bondTotals(){let value=0,invested=0,interest=0,invOwn=0,firstOwn="";const by={};
+  for(const b of S.bonds){const c=bondCalc(b);if(c.matured)continue;value+=c.value;invested+=c.P;interest+=c.interest;by[b.owner]=(by[b.owner]||0)+c.value;
+    if(!b.reinv){invOwn+=c.P;if(!firstOwn||b.date<firstOwn)firstOwn=b.date}}
+  return{value,invested,interest,invOwn,firstOwn,by}}
 
 function viewBnd(){
   const list=S.bonds.map(b=>({b,c:bondCalc(b)})).sort((x,y)=>x.c.end-y.c.end),bt=bondTotals();
@@ -305,13 +333,14 @@ function viewBnd(){
      ${c.miss.length&&!c.matured?`<button class="ghost" data-cpimiss="${esc(c.miss[0])}" style="margin:2px 0 10px">Dodaj brakującą inflację (za ${esc(c.miss[0])})</button>`:""}
      ${op?`<div class="sub"><div class="row"><span>Właściciel</span><b>${esc(b.owner)}</b></div><div class="row"><span>Liczba sztuk</span><b>${fq(b.qty)}</b></div>
       <div class="row"><span>Data zakupu</span><b>${esc(b.date)}</b></div>
+      <div class="row"><span>Źródło środków</span><b>${b.reinv?"reinwestowane odsetki":"moje wpłaty"}</b></div>
       <div class="row"><span>Wykup</span><b>${dd(c.end)} ${c.matured?"(termin minął, usuń po wypłacie)":"(za "+left+" dni)"}</b></div>
       <p class="mu">Oprocentowanie w kolejnych latach: ${c.rates.map((r,i)=>(i+1)+": "+fp(r)).join(", ")}</p>
       <div class="row"><span>${b.cap?"Odsetki naliczone":"Odsetki od ostatniej wypłaty"}</span><b>${sg(c.interest,"PLN")}</b></div>
       <div class="row"><span>${b.cap?"Netto przy wykupie dziś":"Netto po podatku"}</span><b>${money(c.net,"PLN")}</b></div>
       ${retRows(c.tot,b.date,"Stopa zwrotu od zakupu",c.an)}
       <button class="ghost" data-bedit="${esc(b.id)}" style="width:100%;margin:6px 0">Edytuj</button></div>`:""}</div>`}).join(""):`<p class="mu">Nie ma jeszcze obligacji.</p>`;
-  const e=S.bonds.find(x=>x.id===bEdit)||{type:"EDO",name:"",owner:OWNERS[0],date:today(),qty:"",r1:"",margin:"",years:10,cap:1,infl:1,fee:3};
+  const e=S.bonds.find(x=>x.id===bEdit)||{type:"EDO",name:"",owner:OWNERS[0],date:today(),qty:"",r1:"",margin:"",years:10,cap:1,infl:1,fee:3,reinv:false};
   const form=`<div class="card"><b>${bEdit?"Edytuj obligacje":"Dodaj obligacje"}</b><p class="mu">Dane z potwierdzenia zakupu. Jedna sztuka to 100 zł. Lata, sposób naliczania i opłatę sprawdź w warunkach swojej serii. Przy obligacjach o zmiennej stopie (DOR, ROR) wpisz aktualne oprocentowanie, liczę je jako stałe.</p>
    <div class="g2"><div><label>Rodzaj</label><select id="b-type">${Object.keys(BT).map(k=>`<option${k===e.type?" selected":""}>${k}</option>`).join("")}</select></div>
    <div><label>Seria (np. COI0428)</label><input id="b-name" value="${esc(e.name)}"></div></div>
@@ -323,7 +352,7 @@ function viewBnd(){
    <div><label>Marża (%)</label><input id="b-margin" inputmode="decimal" value="${vv(e.margin)}"></div></div>
    <div class="g2"><div><label>Czas trwania (lata)</label><input id="b-years" inputmode="decimal" value="${vv(e.years)}"></div>
    <div><label>Odsetki</label><select id="b-cap"><option value="1"${e.cap?" selected":""}>kapitalizowane (doliczane)</option><option value="0"${e.cap?"":" selected"}>wypłacane (co rok / miesiąc)</option></select></div></div>
-   <label>Opłata za wcześn. wykup (zł/szt.)</label><input id="b-fee" inputmode="decimal" value="${vv(e.fee)}">
+   <label>Opłata za wcześn. wykup (zł/szt.)</label><input id="b-fee" inputmode="decimal" value="${vv(e.fee)}"><label>Źródło środków</label><select id="b-src"><option value="0"${e.reinv?"":" selected"}>Moje wpłaty</option><option value="1"${e.reinv?" selected":""}>Reinwestowane odsetki</option></select>
    <button data-bsave style="width:100%">Zapisz</button>${bEdit?`<p><button class="danger" data-bdel>Usuń obligacje</button></p>`:""}</div>`;
   const cpiForm=`<div class="card"><b>Inflacja GUS (r/r)</b><p class="mu">Wpis dotyczy wszystkich obligacji naraz, więc wystarczy wpisać go raz. Od 2. roku oprocentowanie = inflacja + marża. Dla okresu zaczynającego się w danym miesiącu bierze się inflację za miesiąc sprzed ${LAG} miesięcy (np. okres od czerwca: inflacja za kwiecień).</p>
    <label>Miesiąc inflacji</label><input id="c-m" type="month" value="${esc(cpiKey||miss[0]||"")}">
@@ -332,38 +361,37 @@ function viewBnd(){
    ${[...S.infl].sort((a,b)=>a.m<b.m?1:-1).map(i=>`<button class="item" data-cpidel="${esc(i.m)}"><span>${esc(i.m)}</span><b>${fp(i.v)}</b></button>`).join("")}</div>`;
   return `<div class="g2" style="margin-bottom:12px"><button data-open="bond">+ Dodaj obligację</button><button class="ghost" data-open="cpi">Inflacja GUS</button></div>`+sum+`<div class="card">${items}</div>`+(modal==="bond"?sheet(form):"")+(modal==="cpi"?sheet(cpiForm):"")}
 
-function ppkCalc(){const P=S.ppk,q=quotes.PPK,auto=!!(q&&q.price>0),price=auto?q.price:(P.price||0),src={own:{u:0,c:0},emp:{u:0,c:0},state:{u:0,c:0}};
+const ppkQ=()=>{if(quotes.PPK)return quotes.PPK;const k=Object.keys(quotes).find(x=>/^PPK/i.test(x.trim())||/^PPK/i.test(String(quotes[x].name).trim()));return k?quotes[k]:null};
+function ppkCalc(){const P=S.ppk,q=ppkQ(),auto=!!(q&&q.price>0),price=auto&&!P.override?q.price:(P.price||0),src={own:{u:0,c:0},emp:{u:0,c:0},state:{u:0,c:0}};
   let first=P.first||"";
   for(const e of P.e){const s=src[e.src];if(s){s.u+=e.units;s.c+=e.amount}if(!P.first&&(!first||e.date<first))first=e.date}
   let units=0,contrib=0;for(const k in src){const s=src[k];s.v=s.u*price;units+=s.u;contrib+=s.c}
   const value=units*price,o=src.own,m=src.emp;
   const ownTax=Math.max(o.v-o.c,0)*0.19,empRet=0.7*m.v,empTax=Math.max(0.7*(m.v-m.c),0)*0.19;
-  const gain=value-contrib,myInv=o.v-o.c,myAll=value-o.c;
-  return{src,units,contrib,value,price,auto,first,gain,ret:contrib>0?gain/contrib:NaN,myInv,myInvRet:o.c>0?myInv/o.c:NaN,myAll,myAllRet:o.c>0?myAll/o.c:NaN,ownNet:o.v-ownTax,empNet:empRet-empTax,zus:0.3*m.v,fp:src.state.v,net:o.v-ownTax+empRet-empTax}}
+  const gain=value-contrib;
+  return{src,units,contrib,value,price,auto,q,first,gain,ret:contrib>0?gain/contrib:NaN,ownNet:o.v-ownTax,empNet:empRet-empTax,zus:0.3*m.v,fp:src.state.v,net:o.v-ownTax+empRet-empTax}}
 
-function viewPpk(){const P=S.ppk,c=ppkCalc();
-  const rr=(lab,sub,v,r)=>`<div class="row"><span>${lab}<br><span class="mu">${sub}</span></span><span style="text-align:right">${sg(v,"PLN")}<br>${pct(r)}, rocznie ${pct(ann(r,c.first||today()))}</span></div>`;
-  const top=`<div class="card"><div class="mu">PPK${P.fund?", "+esc(P.fund):""}, wartość rachunku</div><div class="big">${money(c.value,"PLN")}</div>
-   <div class="row"><span>Wpłacono razem</span><b>${money(c.contrib,"PLN")}</b></div>
-   <div class="row"><span>Jednostki</span><b>${fq(c.units)}</b></div>
-   <div class="mu" style="margin:10px 0 2px">Stopa zwrotu${c.first?" (od "+esc(c.first)+")":""}</div>
-   ${rr("Wynik funduszu","same zyski inwestycyjne, % od wszystkich wpłat",c.gain,c.ret)}
-   ${rr("Mój zysk z inwestycji","z moich wpłat, % od moich wpłat",c.myInv,c.myInvRet)}
-   ${rr("Łącznie dla mnie","zysk + wpłaty pracodawcy i państwa, % od moich wpłat",c.myAll,c.myAllRet)}
-   ${c.price>0?"":`<p class="bad">Wpisz kurs jednostki, żeby zobaczyć wartość.</p>`}
-   <label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu">
-   <label>Kurs jednostki (zł)${P.pdate?", z dnia "+esc(P.pdate):""}</label><div class="g2"><input id="pp-price" inputmode="decimal" value="${vv(P.price||"")}"><input id="pp-date" type="date" value="${esc(P.pdate||today())}"></div>
-   ${c.auto?`<p class="mu">Używam kursu z arkusza: ${money(c.price,"PLN")}. Pole powyżej jest rezerwowe.</p>`:""}
-   <p><a href="https://www.analizy.pl/fundusze-ppk/PZU59/ppk-inpzu-2055" target="_blank" rel="noopener" style="color:var(--ac)">Sprawdź aktualny kurs na analizy.pl</a></p>
-   <button data-ppsave>Zapisz kurs</button></div>`;
-  const calc=`<div class="card"><b>Gdybym wypłacił dziś przed 60. rokiem życia</b><div class="big good">${money(c.net,"PLN")}</div>
-   <button class="ghost" data-tog="ppcalc" style="width:100%;margin-top:6px">Szczegóły ${ui.ppcalc?"▲":"▼"}</button>
+function viewPpk(){const P=S.ppk,c=ppkCalc(),fr=c.first||today();
+  const sm=r=>`<div class="mu" style="font-size:12px">${pct(r)} całościowo, rocznie ${pct(ann(r,fr))}</div>`;
+  const vr=c.contrib>0?(c.value-c.contrib)/c.contrib:NaN,wr=c.src.own.c>0?(c.net-c.src.own.c)/c.src.own.c:NaN;
+  const hint=P.override?"Kurs ustawiony ręcznie.":c.auto?"Kurs z arkusza (automatyczny).":c.q?`W arkuszu jest wiersz „${esc(c.q.sym)}”, ale kurs to „${esc(c.q.raw)}”, a nie liczba.`:"Nie widzę w arkuszu wiersza PPK (w kolumnie A musi być PPK). Wpisz kurs ręcznie.";
+  const top=`<div class="card"><div class="g2" style="align-items:start"><div><div class="mu">Wartość PPK</div><div class="big" style="font-size:26px">${money(c.value,"PLN")}</div>${sm(vr)}</div>
+   <div style="text-align:right"><div class="mu">Wypłata dziś</div><div class="big good" style="font-size:26px">${money(c.net,"PLN")}</div>${sm(wr)}</div></div>
+   <button class="ghost" data-tog="ppcalc" style="width:100%;margin-top:8px">Szczegóły wypłaty ${ui.ppcalc?"▲":"▼"}</button>
    ${ui.ppcalc?`<div class="row"><span>Moje wpłaty i zysk, minus 19% od zysku</span><b>${money(c.ownNet,"PLN")}</b></div>
    <div class="row"><span>Pracodawca: 70% środków, minus podatek</span><b>${money(c.empNet,"PLN")}</b></div>
    <div class="row"><span>Państwo</span><b>${money(0,"PLN")}</b></div>
    <div class="row"><span class="mu">30% środków pracodawcy trafia do ZUS</span><span class="mu">${money(c.zus,"PLN")}</span></div>
    <div class="row"><span class="mu">Dopłaty państwa wracają do Funduszu Pracy</span><span class="mu">${money(c.fp,"PLN")}</span></div>
-   <p class="mu">Szacunek wg zasad, które sprawdziłem w źródłach (100% moich wpłat, 70% pracodawcy, 0% państwa, 19% podatku od zysku). Sposób liczenia podstawy podatku porównaj z kalkulatorem PZU przed jakąkolwiek decyzją.</p>`:""}</div>`;
+   <p class="mu">Szacunek wg zasad, które sprawdziłem w źródłach (100% moich wpłat, 70% pracodawcy, 0% państwa, 19% podatku od zysku). Sposób liczenia podstawy podatku porównaj z kalkulatorem PZU przed jakąkolwiek decyzją.</p>`:""}
+   <div class="row"><span>Wpłacono razem</span><b>${money(c.contrib,"PLN")}</b></div>
+   <div class="row"><span>Jednostki</span><b>${fq(c.units)}</b></div>
+   <div class="row"><span>Wynik funduszu</span><span style="text-align:right"><b>${sg(c.gain,"PLN")}</b><br><span class="mu">${pct(c.ret)} całościowo, rocznie ${pct(ann(c.ret,fr))}</span></span></div>
+   <div style="margin-top:10px"><div class="g2"><div><label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu"></div>
+   <div><label>Kurs jednostki (zł)</label><input id="pp-price" inputmode="decimal" value="${vv(c.price||"")}"></div></div>
+   <p class="mu" style="margin:0 0 8px">${hint}</p>
+   <button data-ppsave>Zapisz</button>${P.override&&c.auto?` <button class="ghost" data-ppauto>Wróć do kursu z arkusza</button>`:""}
+   <p><a href="https://www.analizy.pl/fundusze-ppk/PZU59/ppk-inpzu-2055" target="_blank" rel="noopener" style="color:var(--ac)">Sprawdź kurs na analizy.pl</a></p></div></div>`;
   const srcBlock=k=>{const q=c.src[k],ed=ui["ppe:"+k];return `<div class="card"><b>${SRC[k]}</b>
    <div class="row"><span>Suma wpłat</span><b>${money(q.c,"PLN")}</b></div>
    <div class="row"><span>Jednostki</span><b>${fq(q.u)}</b></div>
@@ -372,8 +400,8 @@ function viewPpk(){const P=S.ppk,c=ppkCalc();
    <button data-ppadd="${k}" style="width:100%">Potwierdź</button>
    <button class="ghost" data-tog="ppe:${k}" style="width:100%;margin-top:8px">Edytuj sumy ${ed?"▲":"▼"}</button>
    ${ed?`<div class="g2"><div><label>Suma wpłat (zł)</label><input id="pe-${k}-a" value="${vv(Math.round(q.c*100)/100)}"></div><div><label>Jednostki</label><input id="pe-${k}-u" value="${vv(Math.round(q.u*1e6)/1e6)}"></div></div><button data-ppesave="${k}" style="width:100%">Zapisz sumy</button>`:""}</div>`};
-  const first=`<div class="card"><b>Wpłaty wg źródła</b><label>Data pierwszej wpłaty</label><div class="g2"><input id="pp-first" type="date" value="${esc(c.first||"")}"><button data-ppfirst>Zapisz datę</button></div></div>`;
-  return top+calc+first+Object.keys(SRC).map(srcBlock).join("")}
+  const first=`<div class="card"><label>Data pierwszej wpłaty</label><div class="g2"><input id="pp-first" type="date" value="${esc(c.first||"")}"><button data-ppfirst>Zapisz datę</button></div></div>`;
+  return top+`<button class="ghost" data-tog="ppdep" style="width:100%;margin-bottom:12px">Wpłaty wg źródła ${ui.ppdep?"▲":"▼"}</button>`+(ui.ppdep?first+Object.keys(SRC).map(srcBlock).join(""):"")}
 
 document.addEventListener("change",e=>{
   if(e.target.id==="b-type"){const t=BT[e.target.value];$("#b-years").value=vv(t.y);$("#b-cap").value=t.cap;$("#b-infl").value=t.infl;$("#b-fee").value=vv(t.fee)}});
@@ -386,14 +414,14 @@ document.addEventListener("click",e=>{
   else if("bdel" in d){if(confirm("Usunąć te obligacje?")){S.bonds=S.bonds.filter(x=>x.id!==bEdit);bEdit=null;save()}}
   else if("bsave" in d){const date=$("#b-date").value,qty=num($("#b-qty").value),r1=num($("#b-r1").value),margin=num($("#b-margin").value)||0,years=num($("#b-years").value),fee=num($("#b-fee").value)||0;
     if(!date||!(qty>0)||!(r1>=0)||!(years>0)){alert("Uzupełnij datę, liczbę sztuk, oprocentowanie 1. roku i czas trwania.");return}
-    const rec={id:bEdit||String(Date.now()),type:$("#b-type").value,name:$("#b-name").value.trim(),owner:$("#b-owner").value,date,qty,r1,margin,years,cap:$("#b-cap").value==="1",infl:$("#b-infl").value==="1",fee,paid:(S.bonds.find(x=>x.id===bEdit)||{}).paid||""};if(!rec.cap&&!rec.paid)rec.paid=dd(lastPast(rec));
+    const rec={id:bEdit||String(Date.now()),type:$("#b-type").value,name:$("#b-name").value.trim(),owner:$("#b-owner").value,date,qty,r1,margin,years,cap:$("#b-cap").value==="1",infl:$("#b-infl").value==="1",fee,reinv:$("#b-src").value==="1",paid:(S.bonds.find(x=>x.id===bEdit)||{}).paid||""};if(!rec.cap&&!rec.paid)rec.paid=dd(lastPast(rec));
     S.bonds=bEdit?S.bonds.map(x=>x.id===bEdit?rec:x):[...S.bonds,rec];bEdit=null;save()}
   else if("cpisave" in d){const m=$("#c-m").value,v=num($("#c-v").value);if(!m||isNaN(v)){alert("Wybierz miesiąc i wpisz inflację.");return}
     S.infl=[...S.infl.filter(i=>i.m!==m),{m,v}];save()}
   else if(d.cpidel){if(confirm("Usunąć wpis inflacji "+d.cpidel+"?")){S.infl=S.infl.filter(i=>i.m!==d.cpidel);save()}}
-  else if("ppsave" in d){const price=num($("#pp-price").value),fund=$("#pp-fund").value.trim();
+  else if("ppsave" in d){const price=num($("#pp-price").value),fund=$("#pp-fund").value.trim(),q=ppkQ(),au=q&&q.price>0?q.price:0;
     if(!(price>0)&&!fund){alert("Wpisz kurs jednostki lub nazwę funduszu.");return}
-    S.ppk={...S.ppk,fund,price:price>0?price:S.ppk.price,pdate:price>0?$("#pp-date").value:S.ppk.pdate};save()}
+    S.ppk={...S.ppk,fund,price:price>0?price:S.ppk.price,override:price>0?(!au||Math.abs(price-au)>1e-9):S.ppk.override,pdate:price>0?today():S.ppk.pdate};save()}
   else if(d.peedit){peEdit=d.peedit;modal="ppe";render()}
   else if("pecancel" in d){peEdit=null;render()}
   else if("pedel" in d){if(confirm("Usunąć tę wpłatę?")){S.ppk={...S.ppk,e:S.ppk.e.filter(x=>x.id!==peEdit)};peEdit=null;save()}}
@@ -410,13 +438,22 @@ const fxSync=()=>{const sel=$("#t-sym"),box=$("#t-fxbox"),p=S.pf.find(x=>x.id===
 document.addEventListener("input",e=>{if(["t-qty","t-price","t-fx","t-mg","t-tot"].includes(e.target.id))fxSync()});
 document.addEventListener("change",e=>{if(["t-sym","t-type"].includes(e.target.id))fxSync()});
 document.addEventListener("click",e=>{
-  if(e.target.classList&&e.target.classList.contains("ov")){modal=null;editId=txEdit=bEdit=peEdit=null;render();return}
-  const t=e.target.closest("[data-open],[data-close],[data-tog],[data-addtx],[data-cpimiss],[data-bpaid],[data-ppadd],[data-ppesave],[data-ppfirst]");if(!t)return;const d=t.dataset;
-  if("close" in d){modal=null;editId=txEdit=bEdit=peEdit=null;render()}
-  else if(d.open){modal=d.open;editId=txEdit=bEdit=peEdit=null;txSym="";cpiKey="";render()}
+  if(e.target.classList&&e.target.classList.contains("ov")){modal=null;editId=txEdit=bEdit=peEdit=depEdit=null;render();return}
+  const t=e.target.closest("[data-open],[data-close],[data-tog],[data-addtx],[data-cpimiss],[data-bpaid],[data-ppadd],[data-ppesave],[data-ppfirst],[data-ppauto],[data-depsave],[data-depedit],[data-depdel]");if(!t)return;const d=t.dataset;
+  if("close" in d){modal=null;editId=txEdit=bEdit=peEdit=depEdit=null;render()}
+  else if(d.open){modal=d.open;editId=txEdit=bEdit=peEdit=depEdit=null;txSym="";cpiKey="";render()}
   else if(d.tog){ui[d.tog]=!ui[d.tog];render()}
   else if(d.addtx){txSym=d.addtx;txEdit=null;modal="tx";render()}
   else if(d.cpimiss){cpiKey=d.cpimiss;modal="cpi";render()}
+  else if("ppauto" in d){S.ppk={...S.ppk,override:false};save()}
+  else if(d.depedit){depEdit=d.depedit;modal="dep";render()}
+  else if("depdel" in d){if(confirm("Usunąć tę wpłatę?")){S.dep=S.dep.filter(x=>x.id!==depEdit);depEdit=null;save()}}
+  else if("depsave" in d){const pf=S.pf.find(x=>x.id===pid),date=$("#d-date").value,amount=num($("#d-amount").value),cu=$("#d-cur").value,fx=num($("#d-fx").value),X=cu!=="PLN"?cu:(pf.cur!=="PLN"?pf.cur:null);
+    if(!date||!(amount>0)){alert("Wpisz datę i kwotę wpłaty.");return}
+    if(cu!==pf.cur&&cu!=="PLN"&&pf.cur!=="PLN"){alert("Wpłata w innej walucie niż portfel jest obsługiwana tylko przez PLN.");return}
+    if(X&&!(fx>0)){alert("Podaj kurs z dnia wpłaty (PLN za 1 "+X+").");return}
+    const rec={id:depEdit||String(Date.now()),pid,date,amount,cur:cu,fx:X?fx:1};
+    S.dep=depEdit?S.dep.map(x=>x.id===depEdit?rec:x):[...S.dep,rec];depEdit=null;save()}
   else if(d.bpaid){const b=S.bonds.find(x=>x.id===d.bpaid),due=b&&payDue(b);if(due){b.paid=dd(due);S.bonds=[...S.bonds];save()}}
   else if(d.ppfirst!==undefined){S.ppk={...S.ppk,first:$("#pp-first").value};save()}
   else if(d.ppadd){const k=d.ppadd,a=num($("#pa-"+k+"-a").value),u=num($("#pa-"+k+"-u").value);
@@ -426,6 +463,9 @@ document.addEventListener("click",e=>{
     if(!(a>=0)||!(u>=0)){alert("Wpisz sumę wpłat i jednostek (zero lub więcej).");return}
     const old=S.ppk.e.filter(x=>x.src===k),dt=old.length?old.map(x=>x.date).sort()[0]:today();
     S.ppk={...S.ppk,e:[...S.ppk.e.filter(x=>x.src!==k),...(a>0||u>0?[{id:String(Date.now()),date:dt,src:k,amount:a,units:u}]:[])]};save()}});
+
+document.addEventListener("change",e=>{if(e.target.id==="d-cur"){const pf=S.pf.find(x=>x.id===pid),cu=e.target.value,X=cu!=="PLN"?cu:(pf.cur!=="PLN"?pf.cur:null);
+  $("#d-fxbox").style.display=X?"":"none";$("#d-fxl").textContent="Kurs z dnia wpłaty (PLN za 1 "+(X||"")+")"}});
 
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
@@ -462,7 +502,7 @@ document.addEventListener("click",e=>{
 onAuthStateChanged(auth,u=>{user=u;booted=true;
   if(unsub){unsub();unsub=null}
   if(u){
-    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",first:"",e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));if(S.bonds.some(b=>!b.cap&&!b.paid)){S.bonds.forEach(b=>{if(!b.cap&&!b.paid)b.paid=dd(lastPast(b))});save()}err="";render()},
+    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.dep=S.dep||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));if(S.bonds.some(b=>!b.cap&&!b.paid)){S.bonds.forEach(b=>{if(!b.cap&&!b.paid)b.paid=dd(lastPast(b))});save()}err="";render()},
       e=>{err="Brak dostępu do bazy: "+e.code;render()});
     loadRates()}
   render()});
