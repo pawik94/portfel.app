@@ -6,32 +6,47 @@
 <meta name="theme-color" content="#2b3a67">
 <title>Portfel</title>
 <style>
-:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d}
-@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6;--good:#4ade80}}
+:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d;--card2:#f4f6fa;--tile:#f6f8fc;--hi:rgba(255,255,255,.95);--sh:rgba(28,40,70,.12)}
+@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6;--good:#4ade80;--card2:#161d26;--tile:#202935;--hi:rgba(255,255,255,.07);--sh:rgba(0,0,0,.5)}}
 *{box-sizing:border-box}
-body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(68px + env(safe-area-inset-bottom))}
-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:flex-start;gap:14px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
 h1{font-size:20px;margin:0}
 .st{font-size:12px;color:var(--mu);padding:0 16px 8px;max-width:720px;margin:0 auto}
 main{max-width:720px;margin:0 auto;padding:8px 16px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}
+.card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--bd);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:inset 0 1px 0 var(--hi),0 8px 20px var(--sh),0 1px 3px var(--sh)}
 .big{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
 .mu{color:var(--mu);font-size:14px}.bad{color:var(--bad)}
 .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid var(--bd)}
 .row:first-child{border-top:0}
 .row b{font-variant-numeric:tabular-nums;text-align:right}
 button,input,select{font:inherit;color:inherit}
-button{background:var(--ac);color:var(--card);border:0;border-radius:8px;padding:10px 14px;cursor:pointer}
-button.ghost{background:transparent;color:var(--ac);border:1px solid var(--bd)}
-button.danger{background:transparent;color:var(--bad);border:1px solid var(--bd)}
+button{background:var(--ac);background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 86%,#fff),var(--ac));color:var(--card);border:0;border-radius:10px;padding:10px 14px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 3px 8px var(--sh)}
+button.ghost{background:var(--tile);color:var(--ac);border:1px solid var(--bd);box-shadow:inset 0 1px 0 var(--hi),0 2px 6px var(--sh)}
+button.danger{background:var(--tile);color:var(--bad);border:1px solid var(--bd);box-shadow:none}
 input,select{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:10px;margin:4px 0 10px}
 label{font-size:13px;color:var(--mu)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.item{width:100%;text-align:left;background:transparent;color:var(--tx);border-radius:0;padding:10px 0;border-top:1px solid var(--bd);display:flex;justify-content:space-between;gap:10px}
-.item:first-child{border-top:0}
-nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;background:transparent;color:var(--mu);border-radius:0;padding:14px 2px;font-size:13px}
-nav button.on{color:var(--ac);font-weight:700;box-shadow:inset 0 2px 0 var(--ac)}
+.item{width:100%;text-align:left;background:var(--tile);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:11px 12px;margin:0 0 8px;display:flex;justify-content:space-between;gap:10px;box-shadow:inset 0 1px 0 var(--hi),0 3px 8px var(--sh)}
+.nv{display:flex;gap:7px}
+.ib{width:40px;height:40px;padding:0;display:grid;place-items:center;background:var(--tile);color:var(--mu);border:1px solid var(--bd);border-radius:11px;box-shadow:inset 0 1px 0 var(--hi),0 3px 8px var(--sh)}
+.ib svg{width:23px;height:23px}
+.ib.on{background:var(--ac);color:var(--card);border-color:transparent}
+.pil{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.pl{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:12px 12px 11px;border-radius:16px;border:1px solid var(--bd);border-top:4px solid var(--tc);background:linear-gradient(160deg,var(--card),var(--card2));color:var(--tx);box-shadow:inset 0 1px 0 var(--hi),0 10px 20px var(--sh),0 2px 4px var(--sh);transition:transform .08s,box-shadow .08s}
+.pl:active{transform:translateY(2px);box-shadow:inset 0 1px 0 var(--hi),0 2px 6px var(--sh)}
+.pn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mu)}
+.pn svg{width:19px;height:19px;color:var(--tc);flex:none}
+.pv{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.pp{font-size:13px;font-weight:700;color:var(--tc)}
+.lg{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;font-size:12px;color:var(--mu)}
+.mts{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin:10px 0}
+.mts.two{grid-template-columns:1fr 1fr}
+.mt{background:var(--tile);border:1px solid var(--bd);border-radius:12px;padding:9px 11px;box-shadow:inset 0 1px 0 var(--hi),0 3px 8px var(--sh)}
+.ml{font-size:12px;color:var(--mu);line-height:1.25}
+.mv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px;overflow-wrap:anywhere}
+.mts.two .mv{font-size:21px}
+.ms{margin-top:2px}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}
  .good{color:var(--good)}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;overflow:auto;padding:12px}
@@ -108,22 +123,36 @@ function totals(){let t=0;const by={},miss=new Set();
 
 function warn(tt){return tt.miss.length?`<p class="bad">Brak kursu do PLN dla: ${tt.miss.map(esc).join(", ")}. Te konta nie są wliczone. Dodaj w arkuszu wiersz CURRENCY:${esc(tt.miss[0])}PLN.</p>`:""}
 
-function donut(parts){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return `<p class="mu">Brak danych do wykresu.</p>`;
+const ico={
+ home:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>`,
+ bank:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M4.5 9.5h15"/><path d="M6.5 12v6M10 12v6M14 12v6M17.5 12v6"/><path d="M3.5 20h17"/></svg>`,
+ chart:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4v16h17"/><path d="M7 15.5l3.5-4.2 3 2.4 4.5-6"/><path d="M15 7.5h3v3"/></svg>`,
+ note:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5h.01M18 14.5h.01"/></svg>`,
+ ppk:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3.5"/><text x="12" y="14.7" text-anchor="middle" font-size="7.4" font-weight="800" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">PPK</text></svg>`};
+const NAV=[["all","Strona główna",ico.home],["sav","Konta",ico.bank],["stk","Akcje",ico.chart],["bnd","Obligacje",ico.note],["ppk","PPK",ico.ppk]];
+
+function donut(parts,total){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return `<p class="mu">Brak danych do wykresu.</p>`;
   let off=25,cum=0,segs="",lab="";
-  for(const p of parts){if(!(p.v>0))continue;const q=p.v/tot*100;
-    segs+=`<circle r="15.9155" cx="21" cy="21" fill="none" stroke="var(${p.c})" stroke-width="7" stroke-dasharray="${q} ${100-q}" stroke-dashoffset="${off}"/>`;
-    if(q>=6){const a=(cum+q/2)/100*2*Math.PI-Math.PI/2;lab+=`<text x="${21+15.9155*Math.cos(a)}" y="${21+15.9155*Math.sin(a)}" text-anchor="middle" dominant-baseline="central" font-size="3.4" font-weight="700" fill="var(--card)">${Math.round(q)}%</text>`}
+  for(const p of parts){if(!(p.v>0))continue;const q=p.v/tot*100,l=Math.max(q-0.9,0.1),da=`${l} ${100-l}`,o=off-0.45;
+    segs+=`<circle data-tab="${p.t}" r="15.9155" cx="21" cy="21" fill="none" stroke="var(${p.c})" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}" style="cursor:pointer"><title>${esc(p.n)}</title></circle><circle r="15.9155" cx="21" cy="21" fill="none" stroke="url(#shine)" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}" pointer-events="none"/>`;
+    if(q>=6){const a=(cum+q/2)/100*2*Math.PI-Math.PI/2;lab+=`<text x="${21+15.9155*Math.cos(a)}" y="${21+15.9155*Math.sin(a)}" text-anchor="middle" dominant-baseline="central" font-size="3.2" font-weight="800" fill="#fff" pointer-events="none">${Math.round(q)}%</text>`}
     off-=q;cum+=q}
-  return `<svg viewBox="0 0 42 42" role="img" aria-label="Podział aktywów" style="width:240px;max-width:75%;display:block;margin:0 auto 10px">${segs}${lab}</svg>`}
+  const s=Math.round(total).toLocaleString("pl-PL")+" zł",fs=s.length>10?2.7:3.4;
+  return `<svg viewBox="0 0 42 42" role="img" aria-label="Podział aktywów, razem ${esc(money(total,"PLN"))}" style="width:270px;max-width:82%;display:block;margin:2px auto 10px;overflow:visible">
+   <defs><linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>
+   <filter id="ds" x="-25%" y="-25%" width="150%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1" flood-color="#000" flood-opacity=".35"/></filter></defs>
+   <g filter="url(#ds)">${segs}</g><circle cx="21" cy="21" r="11.9" fill="var(--card)" stroke="var(--bd)" stroke-width=".3"/>${lab}
+   <text x="21" y="19.4" text-anchor="middle" font-size="2.5" fill="var(--mu)">Razem</text><text x="21" y="24" text-anchor="middle" font-size="${fs}" font-weight="800" fill="var(--tx)">${s}</text></svg>`}
 
 function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pk=ppkCalc(),pv=pk.value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
-  const parts=[{n:"Oszczędności i konta",v:sv,c:"--c1"},{n:"Akcje",v:sk.pln,c:"--c2"},{n:"Obligacje",v:bt.value,c:"--c3"},{n:"PPK",v:pv,c:"--c4"}];
+  const parts=[{n:"Oszczędności",v:sv,c:"--c1",t:"sav",i:ico.bank},{n:"Akcje",v:sk.pln,c:"--c2",t:"stk",i:ico.chart},{n:"Obligacje",v:bt.value,c:"--c3",t:"bnd",i:ico.note},{n:"PPK",v:pv,c:"--c4",t:"ppk",i:ico.ppk}];
   const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+" %":"–";
   const own=pk.src.own.c,gAll=sk.gain+(bt.value-bt.invOwn)+(pv-own),bAll=sk.base+bt.invOwn+own,fAll=[sk.first,bt.firstOwn,pk.first].filter(Boolean).sort()[0]||"";
-  return `<div class="card"><div class="mu">Razem</div><div class="big">${money(total,"PLN")}</div>${warn({miss:[...new Set([...tt.miss,...sk.miss])]})}</div>
-  <div class="card"><div class="mu">Inwestycje razem, od moich wpłat</div><div class="row"><span>Wynik</span><b>${sg(gAll,"PLN")}</b></div>${fAll&&bAll>0?retRows(gAll/bAll,fAll):""}
+  const lead=tile("Wynik",sg(gAll,"PLN"));
+  return `<div class="card" style="text-align:center">${donut(parts,total)}<div class="lg">${parts.map(x=>`<span><i class="dot" style="background:var(${x.c})"></i>${x.n} ${pc(x.v)}</span>`).join("")}</div>${warn({miss:[...new Set([...tt.miss,...sk.miss])]})}</div>
+  <div class="pil">${parts.map(x=>`<button class="pl" data-tab="${x.t}" style="--tc:var(${x.c})"><span class="pn">${x.i}${x.n}</span><span class="pv">${money(x.v,"PLN")}</span><span class="pp">${pc(x.v)}</span></button>`).join("")}</div>
+  <div class="card"><b>Inwestycje razem, od moich wpłat</b>${fAll&&bAll>0?retRows(gAll/bAll,fAll,undefined,undefined,lead):tiles([lead])}
    <p class="mu">Podstawą są Twoje wpłaty: do portfeli akcji, obligacje kupione z własnych środków i własne wpłaty do PPK. Reinwestowane odsetki oraz wpłaty pracodawcy i państwa liczą się jako zysk.</p></div>
-  <div class="card">${donut(parts)}${parts.map(x=>`<div class="row"><span><i class="dot" style="background:var(${x.c})"></i>${x.n}</span><b>${money(x.v,"PLN")} <span class="mu">${pc(x.v)}</span></b></div>`).join("")}</div>
   <div class="g2"><button class="ghost" data-bak>Kopia danych</button><button class="ghost" data-out>Wyloguj</button></div>`}
 
 function viewSav(){const tt=totals();
@@ -193,7 +222,7 @@ function stkAll(){const e=stkEquity();let h="";
   for(const p of S.pf){const c=calc(p);if(!c.f)continue;
     h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(c.gain*c.f,"PLN")} (${pct(c.ret)})</span></button>`}
   return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(e.valuePLN,"PLN")}</div>
-   <div class="row"><span>Wynik łącznie</span><b>${sg(e.gain,"PLN")}</b></div>${e.first?retRows(e.base>0?e.gain/e.base:NaN,e.first,e.dep?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
+   ${e.first?retRows(e.base>0?e.gain/e.base:NaN,e.first,e.dep?"Stopa zwrotu od wpłat":"Stopa zwrotu",undefined,tile("Wynik łącznie",sg(e.gain,"PLN"))):tiles([tile("Wynik łącznie",sg(e.gain,"PLN"))])}
    ${e.dep?"":`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów (w których są reinwestowane zyski).</p>`}
    ${e.miss.length?`<p class="bad">Brak kursu do PLN dla: ${e.miss.map(esc).join(", ")}. Te portfele nie są wliczone.</p>`:""}</div><div class="card">${h}</div>`}
 
@@ -224,7 +253,7 @@ function viewStk(){
   const txItem=t=>{const X=ccyOf(t.sym)||cur;return `<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym?nm(t.sym):"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,X)}${t.fx>0&&Math.abs(t.fx-1)>1e-7?`<br><span class="mu">kurs ${vv(t.fx)}${t.mg?`, marża ${vv(t.mg)}%`:""}</span>`:""}`:money(t.amount,cur)}</span></button>`};
   const glob=S.pf.length===1?stkEquity():null,useD=!!(glob&&glob.dep),gC=useD?"PLN":cur,gT=useD?glob.gain:c.gain,rT=useD?(glob.base>0?glob.gain/glob.base:NaN):c.ret,fT=useD?glob.first:c.first;
   const head=`<div class="card"><div class="mu">Wartość portfela</div><div class="big">${money(c.value,cur)}</div>${cur!=="PLN"&&c.f?`<div class="mu">≈ ${money(c.value*c.f,"PLN")}</div>`:""}
-   <div class="row"><span>Wynik łącznie</span><b>${sg(gT,gC)}</b></div>${fT?retRows(rT,fT,useD?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
+   ${fT?retRows(rT,fT,useD?"Stopa zwrotu od wpłat":"Stopa zwrotu",undefined,tile("Wynik łącznie",sg(gT,gC))):tiles([tile("Wynik łącznie",sg(gT,gC))])}
    ${S.pf.length===1&&!useD?`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów.</p>`:""}${S.pf.length>1&&S.dep.length?`<p class="mu">Stopa zwrotu od wpłat dla całości jest w widoku „Wszystkie portfele”. Tu liczy się od zakupów w tym portfelu.</p>`:""}
    ${c.miss.length?`<p class="bad">Brak kursu lub przelicznika waluty dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
    ${c.neg.length?`<p class="bad">Sprzedano więcej niż kupiono: ${c.neg.map(esc).join(", ")}. Sprawdź historię ruchów.</p>`:""}</div>`;
@@ -288,7 +317,9 @@ const vv=x=>x===""||x==null?"":String(x).replace(".",",");
 const inflOf=k=>{const x=S.infl.find(i=>i.m===k);return x?x.v:null};
 
 const ann=(r,from)=>{const n=(D(today())-D(from))/864e5;return n>=365&&1+r>0?Math.pow(1+r,365/n)-1:NaN};
-const retRows=(r,from,label,an)=>`<div class="row"><span>${label||"Stopa zwrotu"} <span class="mu">(od ${esc(from)})</span></span><b>${pct(r)}</b></div><div class="row"><span>Średniorocznie</span><b>${pct(an===undefined?ann(r,from):an)}</b></div>`;
+const tile=(l,v,cls,sub)=>`<div class="mt"><div class="ml">${l}</div><div class="mv ${cls||""}">${v}</div>${sub?`<div class="ms">${sub}</div>`:""}</div>`;
+const tiles=a=>`<div class="mts">${a.join("")}</div>`;
+const retRows=(r,from,label,an,lead)=>tiles([lead||"",tile((label||"Stopa zwrotu")+` <span class="mu">(od ${esc(from)})</span>`,pct(r)),tile("Średniorocznie",pct(an===undefined?ann(r,from):an))].filter(Boolean));
 function payDates(b){const M=Math.round(b.years*12),ty=BT[b.type]||{},out=[];if(b.cap)return out;
   if(ty.mon){for(let n=1;n<=M;n++)out.push(dAddM(b.date,n))}
   else if(M<12)out.push(dAddM(b.date,M));else for(let k=1;k*12<=M;k++)out.push(dAddM(b.date,12*k));
@@ -320,8 +351,7 @@ function viewBnd(){
   const list=S.bonds.map(b=>({b,c:bondCalc(b)})).sort((x,y)=>x.c.end-y.c.end),bt=bondTotals();
   const miss=[...new Set(list.filter(x=>!x.c.matured).flatMap(x=>x.c.miss))].sort();
   const sum=`<div class="card"><div class="mu">Obligacje, wartość szacunkowa</div><div class="big">${money(bt.value,"PLN")}</div>
-   <div class="row"><span>Wpłacono (bez wykupionych)</span><b>${money(bt.invested,"PLN")}</b></div>
-   <div class="row"><span>Odsetki naliczone, niewypłacone (brutto)</span><b>${sg(bt.interest,"PLN")}</b></div>
+   ${tiles([tile("Wpłacono (bez wykupionych)",money(bt.invested,"PLN")),tile("Odsetki naliczone, niewypłacone",sg(bt.interest,"PLN"))])}
    ${miss.length?`<p class="bad">Brakuje inflacji GUS za: ${miss.join(", ")}. Do czasu uzupełnienia liczę tylko marżę, więc wartość jest zaniżona.</p>`:""}</div>`;
   const items=list.length?list.map(({b,c})=>{const op=ui["bond:"+b.id],due=b.cap?null:payDue(b),dl=due?Math.ceil((due-D(today()))/864e5):null,left=Math.ceil((c.end-D(today()))/864e5);
     const cnt=!due?"":dl<=0?`<b class="bad">odsetki do wypłaty od ${dd(due)}</b>`:`do wypłaty odsetek: ${dl<7?`<b class="bad">${dl} dni</b>`:`${dl} dni`}`;
@@ -372,8 +402,7 @@ function viewPpk(){const P=S.ppk,c=ppkCalc(),fr=c.first||today();
   const sm=r=>`<div class="mu" style="font-size:12px">${pct(r)} całościowo, rocznie ${pct(ann(r,fr))}</div>`;
   const vr=c.contrib>0?(c.value-c.contrib)/c.contrib:NaN,wr=c.src.own.c>0?(c.net-c.src.own.c)/c.src.own.c:NaN;
   const hint=P.override?"Kurs ustawiony ręcznie.":c.auto?"Kurs z arkusza (automatyczny).":c.q?`W arkuszu jest wiersz „${esc(c.q.sym)}”, ale kurs to „${esc(c.q.raw)}”, a nie liczba.`:"Nie widzę w arkuszu wiersza PPK (w kolumnie A musi być PPK). Wpisz kurs ręcznie.";
-  const top=`<div class="card"><div class="g2" style="align-items:start"><div><div class="mu">Wartość PPK</div><div class="big" style="font-size:26px">${money(c.value,"PLN")}</div>${sm(vr)}</div>
-   <div style="text-align:right"><div class="mu">Wypłata dziś</div><div class="big good" style="font-size:26px">${money(c.net,"PLN")}</div>${sm(wr)}</div></div>
+  const top=`<div class="card"><div class="mts two">${tile("Wartość PPK",money(c.value,"PLN"),"",sm(vr))}${tile("Wypłata dziś",money(c.net,"PLN"),"good",sm(wr))}</div>
    <button class="ghost" data-tog="ppcalc" style="width:100%;margin-top:8px">Szczegóły wypłaty ${ui.ppcalc?"▲":"▼"}</button>
    ${ui.ppcalc?`<div class="row"><span>Moje wpłaty i zysk, minus 19% od zysku</span><b>${money(c.ownNet,"PLN")}</b></div>
    <div class="row"><span>Pracodawca: 70% środków, minus podatek</span><b>${money(c.empNet,"PLN")}</b></div>
@@ -381,18 +410,14 @@ function viewPpk(){const P=S.ppk,c=ppkCalc(),fr=c.first||today();
    <div class="row"><span class="mu">30% środków pracodawcy trafia do ZUS</span><span class="mu">${money(c.zus,"PLN")}</span></div>
    <div class="row"><span class="mu">Dopłaty państwa wracają do Funduszu Pracy</span><span class="mu">${money(c.fp,"PLN")}</span></div>
    <p class="mu">Szacunek wg zasad, które sprawdziłem w źródłach (100% moich wpłat, 70% pracodawcy, 0% państwa, 19% podatku od zysku). Sposób liczenia podstawy podatku porównaj z kalkulatorem PZU przed jakąkolwiek decyzją.</p>`:""}
-   <div class="row"><span>Wpłacono razem</span><b>${money(c.contrib,"PLN")}</b></div>
-   <div class="row"><span>Jednostki</span><b>${fq(c.units)}</b></div>
-   <div class="row"><span>Wynik funduszu</span><span style="text-align:right"><b>${sg(c.gain,"PLN")}</b><br><span class="mu">${pct(c.ret)} całościowo, rocznie ${pct(ann(c.ret,fr))}</span></span></div>
+   ${tiles([tile("Wpłacono razem",money(c.contrib,"PLN")),tile("Jednostki",fq(c.units)),tile("Wynik funduszu",sg(c.gain,"PLN"),"",`${pct(c.ret)} całościowo, rocznie ${pct(ann(c.ret,fr))}`)])}
    <div style="margin-top:10px"><div class="g2"><div><label>Nazwa funduszu</label><input id="pp-fund" value="${esc(P.fund||"")}" placeholder="nazwa funduszu"></div>
    <div><label>Kurs jednostki (zł)</label><input id="pp-price" inputmode="decimal" value="${vv(c.price||"")}"></div></div>
    <p class="mu" style="margin:0 0 8px">${hint}</p>
    <button data-ppsave>Zapisz</button>${P.override&&c.auto?` <button class="ghost" data-ppauto>Wróć do kursu z arkusza</button>`:""}
    <p><a href="https://www.analizy.pl/fundusze-ppk/PZU59/ppk-inpzu-2055" target="_blank" rel="noopener" style="color:var(--ac)">Sprawdź kurs na analizy.pl</a></p></div></div>`;
   const srcBlock=k=>{const q=c.src[k],ed=ui["ppe:"+k];return `<div class="card"><b>${SRC[k]}</b>
-   <div class="row"><span>Suma wpłat</span><b>${money(q.c,"PLN")}</b></div>
-   <div class="row"><span>Jednostki</span><b>${fq(q.u)}</b></div>
-   <div class="row"><span>Wartość</span><b>${money(q.v,"PLN")}</b></div>
+   ${tiles([tile("Suma wpłat",money(q.c,"PLN")),tile("Jednostki",fq(q.u)),tile("Wartość",money(q.v,"PLN"))])}
    <div class="g2"><div><label>Kolejna wpłata (zł, minus = odejmij)</label><input id="pa-${k}-a" autocomplete="off"></div><div><label>Ilość jednostek</label><input id="pa-${k}-u" autocomplete="off"></div></div>
    <button data-ppadd="${k}" style="width:100%">Potwierdź</button>
    <button class="ghost" data-tog="ppe:${k}" style="width:100%;margin-top:8px">Edytuj sumy ${ed?"▲":"▼"}</button>
@@ -471,10 +496,8 @@ function render(){const app=$("#app");
     <label>Hasło</label><input id="l-pass" type="password" autocomplete="current-password">
     ${loginErr?`<p class="bad">${esc(loginErr)}</p>`:""}<button type="submit" style="width:100%">Zaloguj</button></form>`;return}
   const body=tab==="all"?viewAll():tab==="sav"?viewSav():tab==="stk"?viewStk():tab==="bnd"?viewBnd():viewPpk();
-  const tabs=[["all","Wszystko"],["sav","Konta"],["stk","Akcje"],["bnd","Obligacje"],["ppk","PPK"]];
-  app.innerHTML=`<header><h1>Portfel</h1></header>
-   <div class="st">${tab==="all"?esc(info):""}${err?` <span class="bad">${esc(err)}</span>`:""}</div><main>${body}</main>
-   <nav>${tabs.map(([k,n])=>`<button data-tab="${k}" class="${k===tab?"on":""}">${n}</button>`).join("")}</nav>`}
+  app.innerHTML=`<header><h1>Portfel</h1><div class="nv">${NAV.map(([k,n,i])=>`<button class="ib${k===tab?" on":""}" data-tab="${k}" title="${n}" aria-label="${n}">${i}</button>`).join("")}</div></header>
+   <div class="st">${tab==="all"?esc(info):""}${err?` <span class="bad">${esc(err)}</span>`:""}</div><main>${body}</main>`}
 
 document.addEventListener("submit",async e=>{
   if(e.target.id!=="lf")return;e.preventDefault();loginErr="";
