@@ -173,54 +173,59 @@ function calc(p){const pos={};let fees=0,divs=0,buys=0,realized=0,first="",sold=
     open.push(P)}
   const gain=unreal+realized+divs-fees;
   const f=rates[p.cur]||open.map(x=>quotes[x.sym]&&quotes[x.sym].fx).find(v=>v>0);
-  const dep=depInfo(p);let gainD=NaN,gainDPLN=NaN,retD=NaN;
-  if(dep.dP>0){const cash=dep.dP-buys+sold+divs-fees,eq=value+Math.max(cash,0);gainD=eq-dep.dP;if(f){gainDPLN=eq*f-dep.dPLN;retD=gainDPLN/dep.dPLN}}
-  return{open,miss,neg,value,unreal,realized,divs,fees,gain,buys,first,ret:buys>0?gain/buys:NaN,f,dep,gainD,gainDPLN,retD}}
+  return{open,miss,neg,value,unreal,realized,divs,fees,gain,buys,sold,first,ret:buys>0?gain/buys:NaN,f}}
 
-function depInfo(p){let dP=0,dPLN=0,first="";
-  for(const d of S.dep.filter(x=>x.pid===p.id)){const f=d.fx>0?d.fx:1,a=d.amount;let P,PLN;
-    if(d.cur===p.cur){P=a;PLN=d.cur==="PLN"?a:a*f}
-    else if(d.cur==="PLN"){PLN=a;P=a/f}
-    else if(p.cur==="PLN"){P=a*f;PLN=P}
-    else continue;
-    dP+=P;dPLN+=PLN;if(!first||d.date<first)first=d.date}
-  return{dP,dPLN,first}}
+function depTotal(){let dPLN=0,first="";for(const d of S.dep){dPLN+=d.cur==="PLN"?d.amount:d.amount*(d.fx>0?d.fx:1);if(!first||d.date<first)first=d.date}return{dPLN,first}}
 
-function stkTotals(){let pln=0,gain=0,base=0,first="";const by={},miss=new Set();
+function stkEquity(){let valuePLN=0,buys=0,sold=0,divs=0,fees=0,gainP=0,baseP=0,first="";const miss=new Set();
   for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
-    const u=c.dep.dP>0,fd=u?c.dep.first:c.first;
-    pln+=c.value*c.f;gain+=u?c.gainDPLN:c.gain*c.f;base+=u?c.dep.dPLN:c.buys*c.f;if(fd&&(!first||fd<first))first=fd;
-    by[p.owner]=(by[p.owner]||0)+c.value*c.f}
-  return{pln,gain,base,first,by,miss:[...miss]}}
+    valuePLN+=c.value*c.f;buys+=c.buys*c.f;sold+=c.sold*c.f;divs+=c.divs*c.f;fees+=c.fees*c.f;gainP+=c.gain*c.f;baseP+=c.buys*c.f;
+    if(c.first&&(!first||c.first<first))first=c.first}
+  const D=depTotal();
+  if(D.dPLN>0){const cash=D.dPLN-buys+sold+divs-fees,eq=valuePLN+Math.max(cash,0);return{valuePLN,gain:eq-D.dPLN,base:D.dPLN,first:D.first,dep:true,miss:[...miss]}}
+  return{valuePLN,gain:gainP,base:baseP,first,dep:false,miss:[...miss]}}
 
-function stkAll(){let h="",pln=0,gain=0,base=0,first="";const miss=new Set();
-  for(const p of S.pf){const c=calc(p);if(!c.f){miss.add(p.cur);continue}
-    const u=c.dep.dP>0,g=u?c.gainDPLN:c.gain*c.f,b=u?c.dep.dPLN:c.buys*c.f,fd=u?c.dep.first:c.first,r=u?c.retD:c.ret;
-    pln+=c.value*c.f;gain+=g;base+=b;if(fd&&(!first||fd<first))first=fd;
-    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(g,"PLN")} (${pct(r)})</span></button>`}
-  return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(pln,"PLN")}</div>
-   <div class="row"><span>Wynik łącznie</span><b>${sg(gain,"PLN")}</b></div>${first?retRows(base>0?gain/base:NaN,first):""}
-   ${miss.size?`<p class="bad">Brak kursu do PLN dla: ${[...miss].map(esc).join(", ")}. Te portfele nie są wliczone.</p>`:""}</div><div class="card">${h}</div>`}
+function stkTotals(){let pln=0;const by={};
+  for(const p of S.pf){const c=calc(p);if(!c.f)continue;pln+=c.value*c.f;by[p.owner]=(by[p.owner]||0)+c.value*c.f}
+  const e=stkEquity();return{pln,gain:e.gain,base:e.base,first:e.first,by,miss:e.miss}}
+
+function stkAll(){const e=stkEquity();let h="";
+  for(const p of S.pf){const c=calc(p);if(!c.f)continue;
+    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(c.gain*c.f,"PLN")} (${pct(c.ret)})</span></button>`}
+  return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(e.valuePLN,"PLN")}</div>
+   <div class="row"><span>Wynik łącznie</span><b>${sg(e.gain,"PLN")}</b></div>${e.first?retRows(e.base>0?e.gain/e.base:NaN,e.first,e.dep?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
+   ${e.dep?"":`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów (w których są reinwestowane zyski).</p>`}
+   ${e.miss.length?`<p class="bad">Brak kursu do PLN dla: ${e.miss.map(esc).join(", ")}. Te portfele nie są wliczone.</p>`:""}</div><div class="card">${h}</div>`}
+
+function depForm(){const e=S.dep.find(x=>x.id===depEdit)||{date:today(),amount:"",cur:"PLN",fx:""};
+  return `<div class="card"><b>${depEdit?"Edytuj wpłatę":"Dodaj wpłatę"}</b><p class="mu">Wpłaty dotyczą całości akcji (wszystkich portfeli), więc przeniesienia między portfelami nie psują stopy zwrotu.</p>
+   <div class="g2"><div><label>Data</label><input id="d-date" type="date" value="${esc(e.date)}"></div><div><label>Kwota</label><input id="d-amount" inputmode="decimal" value="${vv(e.amount)}"></div></div>
+   <div class="g2"><div><label>Waluta wpłaty</label><select id="d-cur">${[...new Set(["PLN",...CURS,e.cur])].map(k=>`<option${k===e.cur?" selected":""}>${k}</option>`).join("")}</select></div>
+   <div id="d-fxbox" style="display:${e.cur!=="PLN"?"":"none"}"><label id="d-fxl">Kurs z dnia wpłaty (PLN za 1 ${esc(e.cur)})</label><input id="d-fx" inputmode="decimal" value="${vv(e.fx&&Math.abs(e.fx-1)>1e-7?e.fx:"")}"></div></div>
+   <button data-depsave style="width:100%">Zapisz wpłatę</button>${depEdit?`<p><button class="danger" data-depdel>Usuń wpłatę</button></p>`:""}</div>`}
+
+function depList(){const d=[...S.dep].sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1)),tot=depTotal();
+  return d.length?`<button class="ghost" data-tog="deps" style="width:100%;margin-bottom:12px">Wpłaty do akcji (${d.length}), razem ${money(tot.dPLN,"PLN")} ${ui.deps?"▲":"▼"}</button>${ui.deps?`<div class="card">${d.map(x=>`<button class="item" data-depedit="${esc(x.id)}"><span>${esc(x.date)}</span><span style="text-align:right">${money(x.amount,x.cur)}${x.cur!=="PLN"&&x.fx>0?`<br><span class="mu">kurs ${vv(x.fx)}</span>`:""}</span></button>`).join("")}</div>`:""}`:""}
 
 function viewStk(){
   if(!S.pf.length)pid="";else if(pid==="all"&&S.pf.length===1)pid=S.pf[0].id;else if(pid!=="all"&&!S.pf.find(p=>p.id===pid))pid="all";
   const one=pid&&pid!=="all";
-  const top=`<div class="g2" style="margin-bottom:12px"><button data-open="pf">+ Nowy portfel</button>${one?`<button data-open="dep">+ Dodaj wpłatę</button>`:"<span></span>"}</div>${one?`<button data-open="tx" style="width:100%;margin-bottom:12px">+ Dodaj ruch</button>`:""}`;
+  const top=`<div class="g2" style="margin-bottom:12px"><button data-open="pf">+ Nowy portfel</button><button data-open="dep">+ Dodaj wpłatę</button></div>${one?`<button data-open="tx" style="width:100%;margin-bottom:12px">+ Dodaj ruch</button>`:""}`;
   const pfForm=`<div class="card"><b>Nowy portfel</b><label>Nazwa</label><input id="p-name" placeholder="np. IKE">
    <div class="g2"><div><label>Właściciel</label><select id="p-owner">${OWNERS.map(o=>`<option>${o}</option>`).join("")}</select></div>
    <div><label>Waluta portfela</label><select id="p-cur">${CURS.map(c=>`<option>${c}</option>`).join("")}</select></div></div>
    <button data-addpf style="width:100%">Dodaj portfel</button></div>`;
-  const mod=modal==="pf"?sheet(pfForm):"";
+  const mod=(modal==="pf"?sheet(pfForm):"")+(modal==="dep"?sheet(depForm()):"");
   const sel=S.pf.length?`<select data-pfsel>${S.pf.length>1?`<option value="all"${pid==="all"?" selected":""}>Wszystkie portfele (w PLN)</option>`:""}${S.pf.map(p=>`<option value="${esc(p.id)}"${p.id===pid?" selected":""}>${esc(p.name)} (${esc(p.cur)})</option>`).join("")}</select>`:"";
-  if(!S.pf.length)return top+`<div class="card"><p class="mu">Nie ma jeszcze portfeli. Dodaj pierwszy, np. IKE w PLN albo portfel w USD.</p></div>`+mod;
-  if(pid==="all")return top+sel+stkAll()+mod;
+  if(!S.pf.length)return top+depList()+`<div class="card"><p class="mu">Nie ma jeszcze portfeli. Dodaj pierwszy, np. IKE w PLN albo portfel w USD.</p></div>`+mod;
+  if(pid==="all")return top+depList()+sel+stkAll()+mod;
   const p=S.pf.find(x=>x.id===pid),c=calc(p),cur=p.cur;
   const desc=(a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1);
   const txItem=t=>{const X=ccyOf(t.sym)||cur;return `<button class="item" data-txedit="${esc(t.id)}"><span>${esc(t.date)}, ${TL[t.type]}<br><span class="mu">${esc(t.sym?nm(t.sym):"")}</span></span><span style="text-align:right">${t.type==="buy"||t.type==="sell"?`${fq(t.qty)} × ${money(t.price,X)}${t.fx>0&&Math.abs(t.fx-1)>1e-7?`<br><span class="mu">kurs ${vv(t.fx)}${t.mg?`, marża ${vv(t.mg)}%`:""}</span>`:""}`:money(t.amount,cur)}</span></button>`};
-  const useD=c.dep.dP>0,gT=useD?c.gainD:c.gain,rT=useD?c.retD:c.ret,fT=useD?c.dep.first:c.first;
+  const glob=S.pf.length===1?stkEquity():null,useD=!!(glob&&glob.dep),gC=useD?"PLN":cur,gT=useD?glob.gain:c.gain,rT=useD?(glob.base>0?glob.gain/glob.base:NaN):c.ret,fT=useD?glob.first:c.first;
   const head=`<div class="card"><div class="mu">Wartość portfela</div><div class="big">${money(c.value,cur)}</div>${cur!=="PLN"&&c.f?`<div class="mu">≈ ${money(c.value*c.f,"PLN")}</div>`:""}
-   <div class="row"><span>Wynik łącznie</span><b>${sg(gT,cur)}${useD&&cur!=="PLN"&&!isNaN(c.gainDPLN)?`<br><span class="mu">${sg(c.gainDPLN,"PLN")} w PLN</span>`:""}</b></div>${fT?retRows(rT,fT,useD?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
-   ${useD?"":`<p class="mu">Dodaj wpłaty do portfela, żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów (w których są reinwestowane zyski).</p>`}
+   <div class="row"><span>Wynik łącznie</span><b>${sg(gT,gC)}</b></div>${fT?retRows(rT,fT,useD?"Stopa zwrotu od wpłat":"Stopa zwrotu"):""}
+   ${S.pf.length===1&&!useD?`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów.</p>`:""}${S.pf.length>1&&S.dep.length?`<p class="mu">Stopa zwrotu od wpłat dla całości jest w widoku „Wszystkie portfele”. Tu liczy się od zakupów w tym portfelu.</p>`:""}
    ${c.miss.length?`<p class="bad">Brak kursu lub przelicznika waluty dla: ${c.miss.map(esc).join(", ")}. Te pozycje nie są wliczone do wartości ani wyniku.</p>`:""}
    ${c.neg.length?`<p class="bad">Sprzedano więcej niż kupiono: ${c.neg.map(esc).join(", ")}. Sprawdź historię ruchów.</p>`:""}</div>`;
   const posHtml=c.open.length?c.open.map(x=>{const op=ui["pos:"+x.sym],xs=S.tx.filter(t=>t.pid===p.id&&t.sym===x.sym).sort(desc);
@@ -228,14 +233,6 @@ function viewStk(){
      ${op?`<div class="sub">${x.value!=null&&x.cost>0&&x.first?retRows(x.gain/x.cost,x.first,"Stopa zwrotu pozycji"):""}<button data-addtx="${esc(x.sym)}" style="width:100%;margin:6px 0">+ Dodaj ruch na ${esc(nm(x.sym))}</button>${xs.map(txItem).join("")}</div>`:""}</div>`}).join(""):`<p class="mu">Brak otwartych pozycji. Dodaj pierwszy zakup przyciskiem u góry.</p>`;
   const allTx=S.tx.filter(t=>t.pid===p.id).sort(desc);
   const histCard=allTx.length?`<button class="ghost" data-tog="hist" style="width:100%;margin-bottom:12px">Historia ruchów (${allTx.length}) ${ui.hist?"▲":"▼"}</button>${ui.hist?`<div class="card">${allTx.map(txItem).join("")}</div>`:""}`:"";
-  const de=S.dep.find(x=>x.id===depEdit)||{date:today(),amount:"",cur:cur,fx:""},dX=de.cur!=="PLN"?de.cur:(cur!=="PLN"?cur:null);
-  const depForm=`<div class="card"><b>${depEdit?"Edytuj wpłatę":"Dodaj wpłatę do portfela"}</b><p class="mu">Wpłaty służą do liczenia stopy zwrotu (zakupy zawierają reinwestowane zyski). Kurs podaj jako ile PLN za 1 jednostkę waluty obcej.</p>
-   <div class="g2"><div><label>Data</label><input id="d-date" type="date" value="${esc(de.date)}"></div><div><label>Kwota</label><input id="d-amount" inputmode="decimal" value="${vv(de.amount)}"></div></div>
-   <div class="g2"><div><label>Waluta wpłaty</label><select id="d-cur">${[...new Set([cur,"PLN",...CURS,de.cur])].map(k=>`<option${k===de.cur?" selected":""}>${k}</option>`).join("")}</select></div>
-   <div id="d-fxbox" style="display:${dX?"":"none"}"><label id="d-fxl">Kurs z dnia wpłaty (PLN za 1 ${esc(dX||"")})</label><input id="d-fx" inputmode="decimal" value="${vv(de.fx&&Math.abs(de.fx-1)>1e-7?de.fx:"")}"></div></div>
-   <button data-depsave style="width:100%">Zapisz wpłatę</button>${depEdit?`<p><button class="danger" data-depdel>Usuń wpłatę</button></p>`:""}</div>`;
-  const deps=S.dep.filter(x=>x.pid===p.id).sort(desc);
-  const depHist=deps.length?`<button class="ghost" data-tog="deps" style="width:100%;margin-bottom:12px">Wpłaty do portfela (${deps.length}) ${ui.deps?"▲":"▼"}</button>${ui.deps?`<div class="card">${deps.map(x=>`<button class="item" data-depedit="${esc(x.id)}"><span>${esc(x.date)}</span><span style="text-align:right">${money(x.amount,x.cur)}${x.cur!==cur&&x.fx>0?`<br><span class="mu">kurs ${vv(x.fx)}</span>`:""}</span></button>`).join("")}</div>`:""}`:"";
   const e=S.tx.find(x=>x.id===txEdit)||{type:"buy",date:today(),sym:txSym,qty:"",price:"",fee:"",amount:"",fx:"",mg:"",tot:""};
   const cash=e.type==="div"||e.type==="fee",v=x=>x===""||x==null||x===0?"":String(x).replace(".",","),X=ccyOf(e.sym)||cur,diff=X!==cur;
   const list=Object.keys(quotes).filter(k=>!/^CURRENCY:|^PPK/i.test(k)).sort((a,b)=>nm(a).localeCompare(nm(b)));
@@ -252,7 +249,7 @@ function viewStk(){
    <label>Prowizja w ${esc(cur)} (opcjonalnie)</label><input id="t-fee" inputmode="decimal" value="${v(e.fee)}"></div>
    <div id="t-cash" style="display:${cash?"":"none"}"><label>Kwota w ${esc(cur)} (dywidenda netto albo opłata)</label><input id="t-amount" inputmode="decimal" value="${v(e.amount)}"></div>
    <button data-txsave style="width:100%">Zapisz ruch</button>${txEdit?`<p><button class="danger" data-txdel>Usuń ten ruch</button></p>`:""}</div>`;
-  return top+sel+head+`<div class="card"><b>Pozycje</b>${posHtml}</div>`+depHist+histCard+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`+mod+(modal==="tx"?sheet(txForm):"")+(modal==="dep"?sheet(depForm):"")}
+  return top+depList()+sel+head+`<div class="card"><b>Pozycje</b>${posHtml}</div>`+histCard+`<p><button class="danger" data-delpf>Usuń ten portfel</button></p>`+mod+(modal==="tx"?sheet(txForm):"")}
 
 document.addEventListener("change",e=>{
   if(e.target.matches("[data-pfsel]")){pid=e.target.value;txEdit=null;render()}
@@ -264,7 +261,7 @@ document.addEventListener("click",e=>{
   else if("addpf" in d){const name=$("#p-name").value.trim();if(!name){alert("Wpisz nazwę portfela.");return}
     const id=String(Date.now());S.pf=[...S.pf,{id,name,owner:$("#p-owner").value,cur:$("#p-cur").value}];pid=id;save()}
   else if("delpf" in d){if(S.tx.some(x=>x.pid===pid)){alert("Ten portfel ma ruchy. Najpierw usuń je z historii.");return}
-    if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);S.dep=S.dep.filter(x=>x.pid!==pid);pid="all";save()}}
+    if(confirm("Usunąć ten pusty portfel?")){S.pf=S.pf.filter(x=>x.id!==pid);pid="all";save()}}
   else if(d.txedit){txEdit=d.txedit;modal="tx";render()}
   else if("txcancel" in d){txEdit=null;render()}
   else if("txdel" in d){if(confirm("Usunąć ten ruch?")){S.tx=S.tx.filter(x=>x.id!==txEdit);txEdit=null;save()}}
@@ -448,11 +445,10 @@ document.addEventListener("click",e=>{
   else if("ppauto" in d){S.ppk={...S.ppk,override:false};save()}
   else if(d.depedit){depEdit=d.depedit;modal="dep";render()}
   else if("depdel" in d){if(confirm("Usunąć tę wpłatę?")){S.dep=S.dep.filter(x=>x.id!==depEdit);depEdit=null;save()}}
-  else if("depsave" in d){const pf=S.pf.find(x=>x.id===pid),date=$("#d-date").value,amount=num($("#d-amount").value),cu=$("#d-cur").value,fx=num($("#d-fx").value),X=cu!=="PLN"?cu:(pf.cur!=="PLN"?pf.cur:null);
+  else if("depsave" in d){const date=$("#d-date").value,amount=num($("#d-amount").value),cu=$("#d-cur").value,fx=num($("#d-fx").value);
     if(!date||!(amount>0)){alert("Wpisz datę i kwotę wpłaty.");return}
-    if(cu!==pf.cur&&cu!=="PLN"&&pf.cur!=="PLN"){alert("Wpłata w innej walucie niż portfel jest obsługiwana tylko przez PLN.");return}
-    if(X&&!(fx>0)){alert("Podaj kurs z dnia wpłaty (PLN za 1 "+X+").");return}
-    const rec={id:depEdit||String(Date.now()),pid,date,amount,cur:cu,fx:X?fx:1};
+    if(cu!=="PLN"&&!(fx>0)){alert("Podaj kurs z dnia wpłaty (PLN za 1 "+cu+").");return}
+    const rec={id:depEdit||String(Date.now()),date,amount,cur:cu,fx:cu==="PLN"?1:fx};
     S.dep=depEdit?S.dep.map(x=>x.id===depEdit?rec:x):[...S.dep,rec];depEdit=null;save()}
   else if(d.bpaid){const b=S.bonds.find(x=>x.id===d.bpaid),due=b&&payDue(b);if(due){b.paid=dd(due);S.bonds=[...S.bonds];save()}}
   else if(d.ppfirst!==undefined){S.ppk={...S.ppk,first:$("#pp-first").value};save()}
@@ -464,8 +460,7 @@ document.addEventListener("click",e=>{
     const old=S.ppk.e.filter(x=>x.src===k),dt=old.length?old.map(x=>x.date).sort()[0]:today();
     S.ppk={...S.ppk,e:[...S.ppk.e.filter(x=>x.src!==k),...(a>0||u>0?[{id:String(Date.now()),date:dt,src:k,amount:a,units:u}]:[])]};save()}});
 
-document.addEventListener("change",e=>{if(e.target.id==="d-cur"){const pf=S.pf.find(x=>x.id===pid),cu=e.target.value,X=cu!=="PLN"?cu:(pf.cur!=="PLN"?pf.cur:null);
-  $("#d-fxbox").style.display=X?"":"none";$("#d-fxl").textContent="Kurs z dnia wpłaty (PLN za 1 "+(X||"")+")"}});
+document.addEventListener("change",e=>{if(e.target.id==="d-cur"){const cu=e.target.value;$("#d-fxbox").style.display=cu!=="PLN"?"":"none";$("#d-fxl").textContent="Kurs z dnia wpłaty (PLN za 1 "+cu+")"}});
 
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
