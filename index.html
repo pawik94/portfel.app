@@ -516,11 +516,11 @@ document.addEventListener("change",e=>{if(e.target.id==="d-cur"){const cu=e.targ
 
 function ccyBreakdown(){const m={},add=(c,v)=>{if(v>0)m[c]=(m[c]||0)+v};
   for(const a of S.accounts){const r=rates[a.cur];if(r)add(a.cur,a.amount*r)}
-  for(const p of S.pf){const c=calc(p);if(!c.f)continue;for(const x of c.open)if(x.value!=null)add(x.ccy,x.value*c.f)}
+  for(const p of S.pf){const c=calc(p);if(!c.f)continue;add(p.cur,c.value*c.f)}
   add("PLN",bondTotals().value);add("PLN",ppkCalc().value);
   return Object.entries(m).sort((a,b)=>b[1]-a[1])}
 
-let locked=false,lockIn="",lockMsg="",hiddenAt=0;
+let locked=false,lockIn="",lockMsg="",lockMode="",hiddenAt=0;
 const pinCfg=()=>{try{return JSON.parse(localStorage.getItem("pin"))}catch(e){return null}};
 const pinFail=()=>{try{return JSON.parse(localStorage.getItem("pinf"))||{}}catch(e){return {}}};
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
@@ -530,11 +530,17 @@ async function pinCheck(pin,c){return (await pinHash(pin,unb64(c.s)))===c.h}
 function drawLock(){const el=$("#lock");if(!el)return;if(!locked){el.innerHTML="";el.style.display="none";return}
   const c=pinCfg();if(!c){locked=false;el.style.display="none";return}
   el.style.display="flex";
+  if(lockMode==="forgot"){el.innerHTML=`<div class="lk" style="text-align:left"><h1 style="text-align:center">Portfel</h1><p class="mu">Podaj hasło konta aplikacji, żeby wyłączyć lub zmienić PIN na tym urządzeniu.</p>
+   <label>Hasło konta</label><input id="fg-pass" type="password" autocomplete="current-password">
+   <label>Nowy PIN (4 do 6 cyfr), jeśli chcesz go zmienić</label><input id="fg-new" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+   <label>Powtórz nowy PIN</label><input id="fg-new2" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+   <p class="bad" id="fg-msg" style="min-height:20px">${esc(lockMsg)}</p>
+   <button data-fgnew style="width:100%">Ustaw nowy PIN</button><p><button class="danger" data-fgoff style="width:100%">Wyłącz PIN</button></p><button class="ghost" data-fgback style="width:100%">Wróć</button></div>`;return}
   el.innerHTML=`<div class="lk"><h1>Portfel</h1><p class="mu" style="min-height:22px">${esc(lockMsg||"Wpisz PIN")}</p>
    <div class="dots">${Array.from({length:c.n},(_,i)=>`<i class="${i<lockIn.length?"f":""}"></i>`).join("")}</div>
    <div class="kp">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join("")}<button class="sm" data-kf>Nie pamiętam PIN-u</button><button data-k="0">0</button><button data-kb aria-label="Usuń cyfrę">⌫</button></div></div>`}
 function lockNow(){if(!pinCfg())return;locked=true;lockIn="";lockMsg="";drawLock()}
-async function pinKey(d){const c=pinCfg();if(!c||!locked)return;const f=pinFail();
+async function pinKey(d){const c=pinCfg();if(!c||!locked||lockMode)return;const f=pinFail();
   if(f.until>Date.now()){lockMsg="Spróbuj za "+Math.ceil((f.until-Date.now())/1000)+" s";drawLock();return}
   if(lockIn.length>=c.n)return;lockIn+=d;lockMsg="";drawLock();
   if(lockIn.length===c.n){let ok=false;try{ok=await pinCheck(lockIn,c)}catch(e){}
@@ -543,6 +549,15 @@ async function pinKey(d){const c=pinCfg();if(!c||!locked)return;const f=pinFail(
     if(n>=10){localStorage.removeItem("pin");localStorage.removeItem("pinf");locked=false;drawLock();signOut(auth);alert("Zbyt wiele błędnych prób. Wylogowano, zaloguj się hasłem konta.");return}
     localStorage.setItem("pinf",JSON.stringify({c:n,until:n>=5?Date.now()+30000:0}));
     lockMsg=n>=5?"Błędny PIN. Odczekaj 30 s":"Błędny PIN";drawLock()}}
+async function pinReset(mode){const msg=t=>{const m=$("#fg-msg");if(m)m.textContent=t};
+  const pass=$("#fg-pass").value;if(!pass){msg("Wpisz hasło konta.");return}
+  let np=null;
+  if(mode==="new"){if(!(window.crypto&&crypto.subtle)){msg("Ta przeglądarka nie obsługuje PIN-u (wymaga https).");return}
+    const a=$("#fg-new").value,b=$("#fg-new2").value;if(!/^\d{4,6}$/.test(a)){msg("PIN musi mieć od 4 do 6 cyfr.");return}if(a!==b){msg("PIN-y się różnią.");return}np=a}
+  try{await signInWithEmailAndPassword(auth,(auth.currentUser&&auth.currentUser.email)||EMAIL,pass)}
+  catch(e){msg(["auth/invalid-credential","auth/wrong-password"].includes(e.code)?"Błędne hasło konta.":"Nie udało się sprawdzić hasła ("+e.code+").");return}
+  if(np){const salt=crypto.getRandomValues(new Uint8Array(16));localStorage.setItem("pin",JSON.stringify({s:b64(salt),h:await pinHash(np,salt),n:np.length}))}else localStorage.removeItem("pin");
+  localStorage.removeItem("pinf");lockMode="";locked=false;lockIn="";lockMsg="";drawLock();render()}
 function pinForm(){const c=pinCfg();return `<div class="card"><b>${c?"Zmień lub wyłącz PIN":"Ustaw PIN"}</b><p class="mu">PIN działa tylko na tym urządzeniu i blokuje wejście do aplikacji. Dane w chmurze chroni hasło konta.</p>
    ${c?`<label>Obecny PIN</label><input id="pn-old" type="password" inputmode="numeric" maxlength="6" autocomplete="off">`:""}
    <label>Nowy PIN (4 do 6 cyfr)</label><input id="pn-new" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
@@ -550,10 +565,13 @@ function pinForm(){const c=pinCfg();return `<div class="card"><b>${c?"Zmień lub
    <button data-pinsave style="width:100%">Zapisz PIN</button>${c?`<p><button class="danger" data-pinoff>Wyłącz PIN</button></p>`:""}</div>`}
 
 document.addEventListener("click",async e=>{
-  const t=e.target.closest("[data-k],[data-kb],[data-kf],[data-pinsave],[data-pinoff]");if(!t)return;const d=t.dataset;
+  const t=e.target.closest("[data-k],[data-kb],[data-kf],[data-pinsave],[data-pinoff],[data-fgnew],[data-fgoff],[data-fgback]");if(!t)return;const d=t.dataset;
   if(d.k!==undefined)pinKey(d.k);
   else if("kb" in d){lockIn=lockIn.slice(0,-1);drawLock()}
-  else if("kf" in d){if(confirm("Zresetuję PIN na tym urządzeniu i wylogujesz się. Potem zalogujesz się hasłem konta. Kontynuować?")){localStorage.removeItem("pin");localStorage.removeItem("pinf");locked=false;drawLock();signOut(auth)}}
+  else if("kf" in d){lockMode="forgot";lockMsg="";drawLock()}
+  else if("fgback" in d){lockMode="";lockMsg="";drawLock()}
+  else if("fgnew" in d)pinReset("new");
+  else if("fgoff" in d)pinReset("off");
   else if("pinsave" in d||"pinoff" in d){
     if(!(window.crypto&&crypto.subtle)){alert("Ta przeglądarka nie obsługuje PIN-u (wymaga połączenia https).");return}
     const c=pinCfg();
@@ -565,7 +583,7 @@ document.addEventListener("click",async e=>{
     const salt=crypto.getRandomValues(new Uint8Array(16));
     localStorage.setItem("pin",JSON.stringify({s:b64(salt),h:await pinHash(a,salt),n:a.length}));localStorage.removeItem("pinf");
     modal=null;render();alert("PIN ustawiony.")}});
-document.addEventListener("keydown",e=>{if(!locked)return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace"){lockIn=lockIn.slice(0,-1);drawLock()}});
+document.addEventListener("keydown",e=>{if(!locked||lockMode)return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace"){lockIn=lockIn.slice(0,-1);drawLock()}});
 document.addEventListener("visibilitychange",()=>{if(document.hidden)hiddenAt=Date.now();else if(pinCfg()&&user&&hiddenAt&&Date.now()-hiddenAt>60000)lockNow()});
 if(pinCfg())lockNow();
 
