@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2b3a67">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Portfel">
 <title>Portfel</title>
 <style>
 :root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d;--card2:#f4f6fa;--tile:#f6f8fc;--hi:rgba(255,255,255,.95);--sh:rgba(28,40,70,.12);--c5:#d0556a;--c6:#3d8ed4}
@@ -178,7 +184,7 @@ function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pk=ppkCalc()
    <p class="mu">Podstawą są Twoje wpłaty: do portfeli akcji, obligacje kupione z własnych środków i własne wpłaty do PPK. Reinwestowane odsetki oraz wpłaty pracodawcy i państwa liczą się jako zysk.</p></div>
   <div class="g2" style="margin-bottom:12px"><button class="ghost" data-bak>Kopia danych</button><button class="ghost" data-out>Wyloguj</button></div>
   <button class="ghost" data-tog="set" style="width:100%;margin-bottom:12px">Ustawienia ${ui.set?"▲":"▼"}</button>
-  ${ui.set?`<div class="card"><b>Blokada PIN-em</b><p class="mu">Na tym urządzeniu: ${pinCfg()?"włączona":"wyłączona"}. PIN blokuje wejście do aplikacji i włącza się ponownie po chwili w tle.</p><button data-open="pin" style="width:100%">${pinCfg()?"Zmień lub wyłącz PIN":"Ustaw PIN"}</button></div>
+  ${ui.set?`${installEv?`<div class="card"><b>Aplikacja</b><p class="mu">Zainstaluj Portfel na tym urządzeniu jako aplikację z własną ikoną.</p><button data-install style="width:100%">Zainstaluj aplikację</button></div>`:""}<div class="card"><b>Blokada PIN-em</b><p class="mu">Na tym urządzeniu: ${pinCfg()?"włączona":"wyłączona"}. PIN blokuje wejście do aplikacji i włącza się ponownie po chwili w tle.</p><button data-open="pin" style="width:100%">${pinCfg()?"Zmień lub wyłącz PIN":"Ustaw PIN"}</button></div>
   <div class="card"><b>Przywracanie danych</b><p class="mu">Wybierz plik z „Kopia danych”. Zastąpi wszystkie obecne dane. Przed tym pobiorę kopię obecnych.</p><input id="rs-file" type="file" accept=".json,application/json"></div>`:""}
   ${modal==="pin"?sheet(pinForm()):""}`}
 
@@ -599,6 +605,12 @@ async function restoreFile(f){if(!f)return;let o;
   bakDownload("portfel-przed-przywroceniem-"+today()+".json");
   try{await setDoc(doc(db,"data","state"),st);modal=null;alert("Dane przywrócone.")}catch(x){alert("Nie udało się zapisać danych: "+(x.code||x.message))}}
 document.addEventListener("change",e=>{if(e.target.id==="rs-file"){const f=e.target.files[0];e.target.value="";restoreFile(f)}});
+
+let installEv=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEv=e;if(tab==="all"&&booted&&user&&!modal)render()});
+window.addEventListener("appinstalled",()=>{installEv=null;if(tab==="all")render()});
+document.addEventListener("click",e=>{if(e.target.closest("[data-install]")&&installEv){const ev=installEv;installEv=null;ev.prompt();render()}});
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
