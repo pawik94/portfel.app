@@ -46,13 +46,16 @@ label{font-size:13px;color:var(--mu)}
 .pv{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
 .pp{font-size:13px;font-weight:700;color:var(--tc)}
 .lg{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;font-size:12px;color:var(--mu)}
-.mts{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin:10px 0}
+.mts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.mts.n1{grid-template-columns:1fr}
+.mts.n3>.mt:first-child{grid-column:1/-1}
+@media(min-width:560px){.mts.n3{grid-template-columns:repeat(3,minmax(0,1fr))}.mts.n3>.mt:first-child{grid-column:auto}.mts.n4{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .mts.two{grid-template-columns:1fr 1fr}
 .mt{background:var(--tile);border:1px solid var(--bd);border-radius:12px;padding:9px 11px;box-shadow:inset 0 1px 0 var(--hi),0 3px 8px var(--sh)}
 .ml{font-size:12px;color:var(--mu);line-height:1.25}
 .mv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px;overflow-wrap:anywhere}
 .mts.two .mv{font-size:21px}
-.ms{margin-top:2px}
+.ms{margin-top:2px;font-size:12px;color:var(--mu)}
 .login{max-width:360px;margin:12vh auto;padding:0 16px}
  .good{color:var(--good)}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:30;overflow:auto;padding:12px}
@@ -68,7 +71,6 @@ label{font-size:13px;color:var(--mu)}
 .item>span:last-child{white-space:nowrap;text-align:right;flex:none}
 .mv{font-size:clamp(14px,4.4vw,17px);white-space:nowrap;overflow-wrap:normal}
 .mts.two .mv{font-size:clamp(15px,4.8vw,20px)}
-.mts>.mt:first-child:nth-last-child(3){grid-column:1/-1}
 .pv{font-size:clamp(14px,4.6vw,19px);white-space:nowrap}
 .pp{white-space:nowrap}
 .lock{position:fixed;inset:0;z-index:100;background:var(--bg);align-items:center;justify-content:center;padding:20px}
@@ -108,7 +110,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",
 const num=s=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:NaN};
 const money=(v,c)=>{let r;try{r=new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){r=v.toFixed(2)+" "+c}return r.replace(/\s/g,"\u00a0")};
 
-let user=null,S={accounts:[],pf:[],tx:[],bonds:[],infl:[],ppk:{price:0,pdate:"",e:[]},dep:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
+let user=null,S={accounts:[],pf:[],tx:[],bonds:[],infl:[],ppk:{price:0,pdate:"",e:[]},dep:[],bdep:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
 
 function parseCsv(t){const rows=[];let r=[],f="",q=false;
   for(let i=0;i<t.length;i++){const c=t[i];
@@ -136,7 +138,7 @@ async function loadRates(){
   render()}
 
 async function save(){modal=null;
-  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx,bonds:S.bonds,infl:S.infl,ppk:S.ppk,dep:S.dep},{merge:true});err=""}
+  try{await setDoc(doc(db,"data","state"),{accounts:S.accounts,pf:S.pf,tx:S.tx,bonds:S.bonds,infl:S.infl,ppk:S.ppk,dep:S.dep,bdep:S.bdep},{merge:true});err=""}
   catch(e){err="Nie zapisano: "+e.code}
   render()}
 
@@ -173,7 +175,7 @@ function donut(parts,total,label){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(to
 function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pk=ppkCalc(),pv=pk.value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
   const parts=[{n:"Oszczędności",v:sv,c:"--c1",t:"sav",i:ico.bank},{n:"Akcje",v:sk.pln,c:"--c2",t:"stk",i:ico.chart},{n:"Obligacje",v:bt.value,c:"--c3",t:"bnd",i:ico.note},{n:"PPK",v:pv,c:"--c4",t:"ppk",i:ico.ppk}];
   const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+"\u00a0%":"–";
-  const own=pk.src.own.c,gAll=sk.gain+(bt.value-bt.invOwn)+(pv-own),bAll=sk.base+bt.invOwn+own,fAll=[sk.first,bt.firstOwn,pk.first].filter(Boolean).sort()[0]||"";
+  const bd=bdepTotal(),bB=bd.sum>0?bd.sum:bt.invOwn,bF=bd.sum>0?bd.first:bt.firstOwn,own=pk.src.own.c,gAll=sk.gain+(bt.value-bB)+(pv-own),bAll=sk.base+bB+own,fAll=[sk.first,bF,pk.first].filter(Boolean).sort()[0]||"";
   const lead=tile("Wynik",sg(gAll,"PLN"));
   const cb=ccyBreakdown(),cT=cb.reduce((a,x)=>a+x[1],0),cc=["--c1","--c2","--c3","--c4","--c5","--c6"],cparts=cb.map(([k,v],i)=>({n:k,v,c:cc[i%6]}));
   const ccyCard=cT>0?`<div class="card" style="text-align:center"><b>Podział według waluty</b>${donut(cparts,cT,"Waluty")}${cb.map(([k,v],i)=>`<div class="row" style="text-align:left"><span><i class="dot" style="background:var(${cc[i%6]})"></i>${esc(k)}</span><b>${money(v,"PLN")} <span class="mu">${(v/cT*100).toFixed(1).replace(".",",")}\u00a0%</span></b></div>`).join("")}</div>`:"";
@@ -209,7 +211,7 @@ const sg=(v,c)=>`<span class="nb ${v<0?"bad":v>0?"good":""}">${v>0?"+":""}${mone
 const fq=n=>String(Math.round(n*1e6)/1e6).replace(".",",");
 const TL={buy:"Zakup",sell:"Sprzedaż",div:"Dywidenda",fee:"Opłata"};
 
-let modal=null,ui={},txSym="",cpiKey="",depEdit=null;
+let modal=null,ui={},txSym="",cpiKey="",depEdit=null,bdepEdit=null;
 const sheet=h=>`<div class="ov"><div class="sh"><div style="text-align:right"><button class="ghost" data-close>Zamknij</button></div>${h}</div></div>`;
 const nm=x=>quotes[x]?quotes[x].name:x;
 const rt=c=>c==="PLN"?1:rates[c];
@@ -253,7 +255,7 @@ function stkTotals(){let pln=0;const by={};
 
 function stkAll(){const e=stkEquity();let h="";
   for(const p of S.pf){const c=calc(p);if(!c.f)continue;
-    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="text-align:right"><b>${money(c.value*c.f,"PLN")}</b><br>${sg(c.gain*c.f,"PLN")} (${pct(c.ret)})</span></button>`}
+    h+=`<button class="item" data-pfgo="${esc(p.id)}"><span>${esc(p.name)}<br><span class="mu">${esc(p.owner)}, ${esc(p.cur)}</span></span><span style="flex:0 1 auto;white-space:normal;text-align:right"><b class="nb">${money(c.value,p.cur)}</b>${p.cur!=="PLN"?` <span class="mu nb">(${money(c.value*c.f,"PLN")})</span>`:""}<br>${sg(c.gain,p.cur)} ${pct(c.ret)}${p.cur!=="PLN"?` <span class="mu nb">(${sg(c.gain*c.f,"PLN")})</span>`:""}</span></button>`}
   return `<div class="card"><div class="mu">Wszystkie portfele w PLN</div><div class="big">${money(e.valuePLN,"PLN")}</div>
    ${e.first?retRows(e.base>0?e.gain/e.base:NaN,e.first,e.dep?"Stopa zwrotu od wpłat":"Stopa zwrotu",undefined,tile("Wynik łącznie",sg(e.gain,"PLN"))):tiles([tile("Wynik łącznie",sg(e.gain,"PLN"))])}
    ${e.dep?"":`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat, a nie od zakupów (w których są reinwestowane zyski).</p>`}
@@ -351,8 +353,8 @@ const inflOf=k=>{const x=S.infl.find(i=>i.m===k);return x?x.v:null};
 
 const ann=(r,from)=>{const n=(D(today())-D(from))/864e5;return n>=365&&1+r>0?Math.pow(1+r,365/n)-1:NaN};
 const tile=(l,v,cls,sub)=>`<div class="mt"><div class="ml">${l}</div><div class="mv ${cls||""}">${v}</div>${sub?`<div class="ms">${sub}</div>`:""}</div>`;
-const tiles=a=>`<div class="mts">${a.join("")}</div>`;
-const retRows=(r,from,label,an,lead)=>tiles([lead||"",tile((label||"Stopa zwrotu")+` <span class="mu">(od ${esc(from)})</span>`,pct(r)),tile("Średniorocznie",pct(an===undefined?ann(r,from):an))].filter(Boolean));
+const tiles=a=>`<div class="mts n${a.length}">${a.join("")}</div>`;
+const retRows=(r,from,label,an,lead)=>tiles([lead||"",tile(label||"Stopa zwrotu",pct(r),"",`od ${esc(from)}`),tile("Średniorocznie",pct(an===undefined?ann(r,from):an))].filter(Boolean));
 function payDates(b){const M=Math.round(b.years*12),ty=BT[b.type]||{},out=[];if(b.cap)return out;
   if(ty.mon){for(let n=1;n<=M;n++)out.push(dAddM(b.date,n))}
   else if(M<12)out.push(dAddM(b.date,M));else for(let k=1;k*12<=M;k++)out.push(dAddM(b.date,12*k));
@@ -383,8 +385,11 @@ function bondTotals(){let value=0,invested=0,interest=0,invOwn=0,firstOwn="";con
 function viewBnd(){
   const list=S.bonds.map(b=>({b,c:bondCalc(b)})).sort((x,y)=>x.c.end-y.c.end),bt=bondTotals();
   const miss=[...new Set(list.filter(x=>!x.c.matured).flatMap(x=>x.c.miss))].sort();
+  const bd=bdepTotal(),bG=bt.value-bd.sum;
   const sum=`<div class="card"><div class="mu">Obligacje, wartość szacunkowa</div><div class="big">${money(bt.value,"PLN")}</div>
-   ${tiles([tile("Wpłacono (bez wykupionych)",money(bt.invested,"PLN")),tile("Odsetki naliczone, niewypłacone",sg(bt.interest,"PLN"))])}
+   ${bd.sum>0?retRows(bG/bd.sum,bd.first,"Stopa zwrotu od wpłat",undefined,tile("Wynik od wpłat",sg(bG,"PLN"))):""}
+   ${tiles([tile("Nominał (bez wykupionych)",money(bt.invested,"PLN")),tile("Odsetki naliczone, niewypłacone",sg(bt.interest,"PLN"))])}
+   ${bd.sum>0?"":`<p class="mu">Dodaj wpłaty (przycisk u góry), żeby stopa zwrotu liczyła się od wpłat. Część obligacji mogła być kupiona z odsetek.</p>`}
    ${miss.length?`<p class="bad">Brakuje inflacji GUS za: ${miss.join(", ")}. Do czasu uzupełnienia liczę tylko marżę, więc wartość jest zaniżona.</p>`:""}</div>`;
   const items=list.length?list.map(({b,c})=>{const op=ui["bond:"+b.id],due=b.cap?null:payDue(b),dl=due?Math.ceil((due-D(today()))/864e5):null,left=Math.ceil((c.end-D(today()))/864e5);
     const cnt=!due?"":dl<=0?`<b class="bad">odsetki do wypłaty od ${dd(due)}</b>`:`do wypłaty odsetek: ${dl<7?`<b class="bad">${dl} dni</b>`:`${dl} dni`}`;
@@ -419,7 +424,7 @@ function viewBnd(){
    <label>Inflacja (%)</label><input id="c-v" inputmode="decimal">
    <button data-cpisave style="width:100%">Zapisz inflację</button>
    ${[...S.infl].sort((a,b)=>a.m<b.m?1:-1).map(i=>`<button class="item" data-cpidel="${esc(i.m)}"><span>${esc(i.m)}</span><b>${fp(i.v)}</b></button>`).join("")}</div>`;
-  return `<div class="g2" style="margin-bottom:12px"><button data-open="bond">+ Dodaj obligację</button><button class="ghost" data-open="cpi">Inflacja GUS</button></div>`+sum+`<div class="card">${items}</div>`+(modal==="bond"?sheet(form):"")+(modal==="cpi"?sheet(cpiForm):"")}
+  return `<div class="g2" style="margin-bottom:12px"><button data-open="bond">+ Dodaj obligację</button><button data-open="bdep">+ Dodaj wpłatę</button></div><button class="ghost" data-open="cpi" style="width:100%;margin-bottom:12px">Inflacja GUS</button>`+bdepList()+sum+`<div class="card">${items}</div>`+(modal==="bond"?sheet(form):"")+(modal==="cpi"?sheet(cpiForm):"")+(modal==="bdep"?sheet(bdepForm()):"")}
 
 const ppkQ=()=>{if(quotes.PPK)return quotes.PPK;const k=Object.keys(quotes).find(x=>/^PPK/i.test(x.trim())||/^PPK/i.test(String(quotes[x].name).trim()));return k?quotes[k]:null};
 function ppkCalc(){const P=S.ppk,q=ppkQ(),auto=!!(q&&q.price>0),price=auto&&!P.override?q.price:(P.price||0),src={own:{u:0,c:0},emp:{u:0,c:0},state:{u:0,c:0}};
@@ -435,7 +440,7 @@ function viewPpk(){const P=S.ppk,c=ppkCalc(),fr=c.first||today();
   const sm=r=>`<div class="mu" style="font-size:12px">${pct(r)} całościowo, rocznie ${pct(ann(r,fr))}</div>`;
   const vr=c.contrib>0?(c.value-c.contrib)/c.contrib:NaN,wr=c.src.own.c>0?(c.net-c.src.own.c)/c.src.own.c:NaN;
   const hint=P.override?"Kurs ustawiony ręcznie.":c.auto?"Kurs z arkusza (automatyczny).":c.q?`W arkuszu jest wiersz „${esc(c.q.sym)}”, ale kurs to „${esc(c.q.raw)}”, a nie liczba.`:"Nie widzę w arkuszu wiersza PPK (w kolumnie A musi być PPK). Wpisz kurs ręcznie.";
-  const top=`<div class="card"><div class="mts two">${tile("Wartość PPK",money(c.value,"PLN"),"",sm(vr))}${tile("Wypłata dziś",money(c.net,"PLN"),"good",sm(wr))}</div>
+  const top=`<div class="card"><div class="mts n2 two">${tile("Wartość PPK",money(c.value,"PLN"),"",sm(vr))}${tile("Wypłata dziś",money(c.net,"PLN"),"good",sm(wr))}</div>
    <button class="ghost" data-tog="ppcalc" style="width:100%;margin-top:8px">Szczegóły wypłaty ${ui.ppcalc?"▲":"▼"}</button>
    ${ui.ppcalc?`<div class="row"><span>Moje wpłaty i zysk, minus 19% od zysku</span><b>${money(c.ownNet,"PLN")}</b></div>
    <div class="row"><span>Pracodawca: 70% środków, minus podatek</span><b>${money(c.empNet,"PLN")}</b></div>
@@ -493,10 +498,10 @@ const fxSync=()=>{const sel=$("#t-sym"),box=$("#t-fxbox"),p=S.pf.find(x=>x.id===
 document.addEventListener("input",e=>{if(["t-qty","t-price","t-fx","t-mg","t-tot"].includes(e.target.id))fxSync()});
 document.addEventListener("change",e=>{if(["t-sym","t-type"].includes(e.target.id))fxSync()});
 document.addEventListener("click",e=>{
-  if(e.target.classList&&e.target.classList.contains("ov")){modal=null;editId=txEdit=bEdit=peEdit=depEdit=null;render();return}
-  const t=e.target.closest("[data-open],[data-close],[data-tog],[data-addtx],[data-cpimiss],[data-bpaid],[data-ppadd],[data-ppesave],[data-ppfirst],[data-ppauto],[data-depsave],[data-depedit],[data-depdel]");if(!t)return;const d=t.dataset;
-  if("close" in d){modal=null;editId=txEdit=bEdit=peEdit=depEdit=null;render()}
-  else if(d.open){modal=d.open;editId=txEdit=bEdit=peEdit=depEdit=null;txSym="";cpiKey="";render()}
+  if(e.target.classList&&e.target.classList.contains("ov")){modal=null;editId=txEdit=bEdit=peEdit=depEdit=bdepEdit=null;render();return}
+  const t=e.target.closest("[data-open],[data-close],[data-tog],[data-addtx],[data-cpimiss],[data-bpaid],[data-ppadd],[data-ppesave],[data-ppfirst],[data-ppauto],[data-depsave],[data-depedit],[data-depdel],[data-bdepsave],[data-bdepedit],[data-bdepdel]");if(!t)return;const d=t.dataset;
+  if("close" in d){modal=null;editId=txEdit=bEdit=peEdit=depEdit=bdepEdit=null;render()}
+  else if(d.open){modal=d.open;editId=txEdit=bEdit=peEdit=depEdit=bdepEdit=null;txSym="";cpiKey="";render()}
   else if(d.tog){ui[d.tog]=!ui[d.tog];render()}
   else if(d.addtx){txSym=d.addtx;txEdit=null;modal="tx";render()}
   else if(d.cpimiss){cpiKey=d.cpimiss;modal="cpi";render()}
@@ -508,6 +513,12 @@ document.addEventListener("click",e=>{
     if(cu!=="PLN"&&!(fx>0)){alert("Podaj kurs z dnia wpłaty (PLN za 1 "+cu+").");return}
     const rec={id:depEdit||String(Date.now()),date,amount,cur:cu,fx:cu==="PLN"?1:fx};
     S.dep=depEdit?S.dep.map(x=>x.id===depEdit?rec:x):[...S.dep,rec];depEdit=null;save()}
+  else if(d.bdepedit){bdepEdit=d.bdepedit;modal="bdep";render()}
+  else if("bdepdel" in d){if(confirm("Usunąć tę wpłatę?")){S.bdep=S.bdep.filter(x=>x.id!==bdepEdit);bdepEdit=null;save()}}
+  else if("bdepsave" in d){const date=$("#bd-date").value,amount=num($("#bd-amount").value);
+    if(!date||!(amount>0)){alert("Wpisz datę i kwotę wpłaty.");return}
+    const rec={id:bdepEdit||String(Date.now()),date,amount};
+    S.bdep=bdepEdit?S.bdep.map(x=>x.id===bdepEdit?rec:x):[...S.bdep,rec];bdepEdit=null;save()}
   else if(d.bpaid){const b=S.bonds.find(x=>x.id===d.bpaid),due=b&&payDue(b);if(due){b.paid=dd(due);S.bonds=[...S.bonds];save()}}
   else if(d.ppfirst!==undefined){S.ppk={...S.ppk,first:$("#pp-first").value};save()}
   else if(d.ppadd){const k=d.ppadd,a=num($("#pa-"+k+"-a").value),u=num($("#pa-"+k+"-u").value);
@@ -597,9 +608,9 @@ const readText=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>
 function bakDownload(name){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,_meta:{app:"portfel",at:new Date().toISOString()}},null,1)],{type:"application/json"}));a.download=name;a.click()}
 async function restoreFile(f){if(!f)return;let o;
   try{o=JSON.parse(await readText(f))}catch(x){alert("To nie jest poprawny plik kopii (JSON).");return}
-  if(!o||typeof o!=="object"||!["accounts","pf","tx","bonds","dep","ppk"].some(k=>k in o)){alert("W pliku nie widzę danych portfela.");return}
+  if(!o||typeof o!=="object"||!["accounts","pf","tx","bonds","dep","bdep","ppk"].some(k=>k in o)){alert("W pliku nie widzę danych portfela.");return}
   const A=k=>Array.isArray(o[k])?o[k]:[];
-  const st={accounts:A("accounts"),pf:A("pf"),tx:A("tx"),bonds:A("bonds"),infl:A("infl"),dep:A("dep"),ppk:Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},o.ppk&&typeof o.ppk==="object"?o.ppk:{})};
+  const st={accounts:A("accounts"),pf:A("pf"),tx:A("tx"),bonds:A("bonds"),infl:A("infl"),dep:A("dep"),bdep:A("bdep"),ppk:Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},o.ppk&&typeof o.ppk==="object"?o.ppk:{})};
   if(!Array.isArray(st.ppk.e))st.ppk.e=[];
   if(!confirm("Przywrócić dane z pliku? To ZASTĄPI wszystkie obecne dane.\n\nW pliku: konta "+st.accounts.length+", portfele "+st.pf.length+", ruchy "+st.tx.length+", obligacje "+st.bonds.length+", wpłaty do akcji "+st.dep.length+", wpłaty PPK "+st.ppk.e.length+".\n\nPrzed przywróceniem pobiorę kopię obecnych danych."))return;
   bakDownload("portfel-przed-przywroceniem-"+today()+".json");
@@ -611,6 +622,14 @@ window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEv=e
 window.addEventListener("appinstalled",()=>{installEv=null;if(tab==="all")render()});
 document.addEventListener("click",e=>{if(e.target.closest("[data-install]")&&installEv){const ev=installEv;installEv=null;ev.prompt();render()}});
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+
+function bdepTotal(){let sum=0,first="";for(const d of S.bdep){sum+=d.amount;if(!first||d.date<first)first=d.date}return{sum,first}}
+function bdepForm(){const e=S.bdep.find(x=>x.id===bdepEdit)||{date:today(),amount:""};
+  return `<div class="card"><b>${bdepEdit?"Edytuj wpłatę":"Dodaj wpłatę na obligacje"}</b><p class="mu">Twoje własne pieniądze włożone w obligacje (nie odsetki, które reinwestujesz). Na ich podstawie liczy się stopa zwrotu.</p>
+   <div class="g2"><div><label>Data</label><input id="bd-date" type="date" value="${esc(e.date)}"></div><div><label>Kwota (zł)</label><input id="bd-amount" inputmode="decimal" value="${vv(e.amount)}"></div></div>
+   <button data-bdepsave style="width:100%">Zapisz wpłatę</button>${bdepEdit?`<p><button class="danger" data-bdepdel>Usuń wpłatę</button></p>`:""}</div>`}
+function bdepList(){const d=[...S.bdep].sort((a,b)=>a.date===b.date?(a.id<b.id?1:-1):(a.date<b.date?1:-1)),tot=bdepTotal();
+  return d.length?`<button class="ghost" data-tog="bdeps" style="width:100%;margin-bottom:12px">Wpłaty na obligacje (${d.length}), razem ${money(tot.sum,"PLN")} ${ui.bdeps?"▲":"▼"}</button>${ui.bdeps?`<div class="card">${d.map(x=>`<button class="item" data-bdepedit="${esc(x.id)}"><span>${esc(x.date)}</span><span style="text-align:right">${money(x.amount,"PLN")}</span></button>`).join("")}</div>`:""}`:""}
 
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
@@ -645,7 +664,7 @@ document.addEventListener("click",e=>{
 onAuthStateChanged(auth,u=>{user=u;booted=true;if(!u&&locked){locked=false;drawLock()}
   if(unsub){unsub();unsub=null}
   if(u){
-    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.dep=S.dep||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));if(S.bonds.some(b=>!b.cap&&!b.paid)){S.bonds.forEach(b=>{if(!b.cap&&!b.paid)b.paid=dd(lastPast(b))});save()}err="";render()},
+    unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.dep=S.dep||[];S.bdep=S.bdep||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));if(S.bonds.some(b=>!b.cap&&!b.paid)){S.bonds.forEach(b=>{if(!b.cap&&!b.paid)b.paid=dd(lastPast(b))});save()}err="";render()},
       e=>{err="Brak dostępu do bazy: "+e.code;render()});
     loadRates()}
   render()});
