@@ -6,8 +6,8 @@
 <meta name="theme-color" content="#2b3a67">
 <title>Portfel</title>
 <style>
-:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d;--card2:#f4f6fa;--tile:#f6f8fc;--hi:rgba(255,255,255,.95);--sh:rgba(28,40,70,.12)}
-@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6;--good:#4ade80;--card2:#161d26;--tile:#202935;--hi:rgba(255,255,255,.07);--sh:rgba(0,0,0,.5)}}
+:root{--bg:#eceff3;--card:#fff;--tx:#18202c;--mu:#5d6878;--ac:#2b3a67;--ac2:#e8ebf5;--bd:#d9dee6;--bad:#b42318;--c1:#2b3a67;--c2:#1f8a7a;--c3:#c9822b;--c4:#8e5db5;--good:#15803d;--card2:#f4f6fa;--tile:#f6f8fc;--hi:rgba(255,255,255,.95);--sh:rgba(28,40,70,.12);--c5:#d0556a;--c6:#3d8ed4}
+@media(prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a212b;--tx:#e7ebf1;--mu:#9aa5b5;--ac:#9fb1f0;--ac2:#232c3d;--bd:#2a3340;--bad:#f97066;--c1:#9fb1f0;--c2:#4fc3b0;--c3:#f0b25e;--c4:#c39be6;--good:#4ade80;--card2:#161d26;--tile:#202935;--hi:rgba(255,255,255,.07);--sh:rgba(0,0,0,.5);--c5:#f08aa0;--c6:#7ab8f0}}
 *{box-sizing:border-box}
 body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);padding:env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:center;justify-content:flex-start;gap:14px;padding:14px 16px 6px;max-width:720px;margin:0 auto}
@@ -54,10 +54,30 @@ label{font-size:13px;color:var(--mu)}
 .sub{padding:0 0 6px 10px;border-left:2px solid var(--bd);margin-left:2px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.nb{white-space:nowrap}
+.big{font-size:clamp(24px,8.4vw,34px);white-space:nowrap}
+.row>:first-child{min-width:0}
+.row>:last-child{white-space:nowrap;text-align:right}
+.item>span:first-child{min-width:0}
+.item>span:last-child{white-space:nowrap;text-align:right;flex:none}
+.mv{font-size:clamp(14px,4.4vw,17px);white-space:nowrap;overflow-wrap:normal}
+.mts.two .mv{font-size:clamp(15px,4.8vw,20px)}
+.mts>.mt:first-child:nth-last-child(3){grid-column:1/-1}
+.pv{font-size:clamp(14px,4.6vw,19px);white-space:nowrap}
+.pp{white-space:nowrap}
+.lock{position:fixed;inset:0;z-index:100;background:var(--bg);align-items:center;justify-content:center;padding:20px}
+.lk{width:100%;max-width:320px;text-align:center}
+.dots{display:flex;justify-content:center;gap:14px;margin:16px 0 24px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ac)}
+.dots i.f{background:var(--ac)}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kp button{height:64px;font-size:24px;font-weight:600;border-radius:16px;background:var(--tile);color:var(--tx);border:1px solid var(--bd);box-shadow:inset 0 1px 0 var(--hi),0 4px 10px var(--sh);padding:0}
+.kp button.sm{font-size:12px;font-weight:500;color:var(--mu)}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="lock" class="lock" style="display:none"></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -80,7 +100,7 @@ const db=getFirestore(auth.app);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const num=s=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(",","."));return isFinite(n)?n:NaN};
-const money=(v,c)=>{try{return new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){return v.toFixed(2)+" "+c}};
+const money=(v,c)=>{let r;try{r=new Intl.NumberFormat("pl-PL",{style:"currency",currency:c}).format(v)}catch(e){r=v.toFixed(2)+" "+c}return r.replace(/\s/g,"\u00a0")};
 
 let user=null,S={accounts:[],pf:[],tx:[],bonds:[],infl:[],ppk:{price:0,pdate:"",e:[]},dep:[]},tab="all",editId=null,err="",loginErr="",rates={PLN:1},quotes={},info="",unsub=null,booted=false;
 
@@ -131,10 +151,10 @@ const ico={
  ppk:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3.5"/><text x="12" y="14.7" text-anchor="middle" font-size="7.4" font-weight="800" fill="currentColor" stroke="none" font-family="system-ui,sans-serif">PPK</text></svg>`};
 const NAV=[["all","Strona główna",ico.home],["sav","Konta",ico.bank],["stk","Akcje",ico.chart],["bnd","Obligacje",ico.note],["ppk","PPK",ico.ppk]];
 
-function donut(parts,total){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return `<p class="mu">Brak danych do wykresu.</p>`;
+function donut(parts,total,label){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))return `<p class="mu">Brak danych do wykresu.</p>`;
   let off=25,cum=0,segs="",lab="";
   for(const p of parts){if(!(p.v>0))continue;const q=p.v/tot*100,l=Math.max(q-0.9,0.1),da=`${l} ${100-l}`,o=off-0.45;
-    segs+=`<circle data-tab="${p.t}" r="15.9155" cx="21" cy="21" fill="none" stroke="var(${p.c})" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}" style="cursor:pointer"><title>${esc(p.n)}</title></circle><circle r="15.9155" cx="21" cy="21" fill="none" stroke="url(#shine)" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}" pointer-events="none"/>`;
+    segs+=`<circle ${p.t?`data-tab="${p.t}" style="cursor:pointer"`:""} r="15.9155" cx="21" cy="21" fill="none" stroke="var(${p.c})" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}"><title>${esc(p.n)}</title></circle><circle r="15.9155" cx="21" cy="21" fill="none" stroke="url(#shine)" stroke-width="7" stroke-dasharray="${da}" stroke-dashoffset="${o}" pointer-events="none"/>`;
     if(q>=6){const a=(cum+q/2)/100*2*Math.PI-Math.PI/2;lab+=`<text x="${21+15.9155*Math.cos(a)}" y="${21+15.9155*Math.sin(a)}" text-anchor="middle" dominant-baseline="central" font-size="3.2" font-weight="800" fill="#fff" pointer-events="none">${Math.round(q)}%</text>`}
     off-=q;cum+=q}
   const s=Math.round(total).toLocaleString("pl-PL")+" zł",fs=s.length>10?2.7:3.4;
@@ -142,18 +162,25 @@ function donut(parts,total){const tot=parts.reduce((a,p)=>a+p.v,0);if(!(tot>0))r
    <defs><linearGradient id="shine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>
    <filter id="ds" x="-25%" y="-25%" width="150%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1" flood-color="#000" flood-opacity=".35"/></filter></defs>
    <g filter="url(#ds)">${segs}</g><circle cx="21" cy="21" r="11.9" fill="var(--card)" stroke="var(--bd)" stroke-width=".3"/>${lab}
-   <text x="21" y="19.4" text-anchor="middle" font-size="2.5" fill="var(--mu)">Razem</text><text x="21" y="24" text-anchor="middle" font-size="${fs}" font-weight="800" fill="var(--tx)">${s}</text></svg>`}
+   <text x="21" y="19.4" text-anchor="middle" font-size="2.5" fill="var(--mu)">${esc(label||"Razem")}</text><text x="21" y="24" text-anchor="middle" font-size="${fs}" font-weight="800" fill="var(--tx)">${s}</text></svg>`}
 
 function viewAll(){const tt=totals(),sk=stkTotals(),bt=bondTotals(),pk=ppkCalc(),pv=pk.value,sv=tt.t,total=sv+sk.pln+bt.value+pv;
   const parts=[{n:"Oszczędności",v:sv,c:"--c1",t:"sav",i:ico.bank},{n:"Akcje",v:sk.pln,c:"--c2",t:"stk",i:ico.chart},{n:"Obligacje",v:bt.value,c:"--c3",t:"bnd",i:ico.note},{n:"PPK",v:pv,c:"--c4",t:"ppk",i:ico.ppk}];
-  const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+" %":"–";
+  const pc=v=>total>0?(v/total*100).toFixed(1).replace(".",",")+"\u00a0%":"–";
   const own=pk.src.own.c,gAll=sk.gain+(bt.value-bt.invOwn)+(pv-own),bAll=sk.base+bt.invOwn+own,fAll=[sk.first,bt.firstOwn,pk.first].filter(Boolean).sort()[0]||"";
   const lead=tile("Wynik",sg(gAll,"PLN"));
+  const cb=ccyBreakdown(),cT=cb.reduce((a,x)=>a+x[1],0),cc=["--c1","--c2","--c3","--c4","--c5","--c6"],cparts=cb.map(([k,v],i)=>({n:k,v,c:cc[i%6]}));
+  const ccyCard=cT>0?`<div class="card" style="text-align:center"><b>Podział według waluty</b>${donut(cparts,cT,"Waluty")}${cb.map(([k,v],i)=>`<div class="row" style="text-align:left"><span><i class="dot" style="background:var(${cc[i%6]})"></i>${esc(k)}</span><b>${money(v,"PLN")} <span class="mu">${(v/cT*100).toFixed(1).replace(".",",")}\u00a0%</span></b></div>`).join("")}</div>`:"";
   return `<div class="card" style="text-align:center">${donut(parts,total)}<div class="lg">${parts.map(x=>`<span><i class="dot" style="background:var(${x.c})"></i>${x.n} ${pc(x.v)}</span>`).join("")}</div>${warn({miss:[...new Set([...tt.miss,...sk.miss])]})}</div>
   <div class="pil">${parts.map(x=>`<button class="pl" data-tab="${x.t}" style="--tc:var(${x.c})"><span class="pn">${x.i}${x.n}</span><span class="pv">${money(x.v,"PLN")}</span><span class="pp">${pc(x.v)}</span></button>`).join("")}</div>
+  ${ccyCard}
   <div class="card"><b>Inwestycje razem, od moich wpłat</b>${fAll&&bAll>0?retRows(gAll/bAll,fAll,undefined,undefined,lead):tiles([lead])}
    <p class="mu">Podstawą są Twoje wpłaty: do portfeli akcji, obligacje kupione z własnych środków i własne wpłaty do PPK. Reinwestowane odsetki oraz wpłaty pracodawcy i państwa liczą się jako zysk.</p></div>
-  <div class="g2"><button class="ghost" data-bak>Kopia danych</button><button class="ghost" data-out>Wyloguj</button></div>`}
+  <div class="g2" style="margin-bottom:12px"><button class="ghost" data-bak>Kopia danych</button><button class="ghost" data-out>Wyloguj</button></div>
+  <button class="ghost" data-tog="set" style="width:100%;margin-bottom:12px">Ustawienia ${ui.set?"▲":"▼"}</button>
+  ${ui.set?`<div class="card"><b>Blokada PIN-em</b><p class="mu">Na tym urządzeniu: ${pinCfg()?"włączona":"wyłączona"}. PIN blokuje wejście do aplikacji i włącza się ponownie po chwili w tle.</p><button data-open="pin" style="width:100%">${pinCfg()?"Zmień lub wyłącz PIN":"Ustaw PIN"}</button></div>
+  <div class="card"><b>Przywracanie danych</b><p class="mu">Wybierz plik z „Kopia danych”. Zastąpi wszystkie obecne dane. Przed tym pobiorę kopię obecnych.</p><input id="rs-file" type="file" accept=".json,application/json"></div>`:""}
+  ${modal==="pin"?sheet(pinForm()):""}`}
 
 function viewSav(){const tt=totals();
   const a=S.accounts.find(x=>x.id===editId)||{name:"",owner:OWNERS[0],cur:"PLN",amount:""};
@@ -171,8 +198,8 @@ function viewSav(){const tt=totals();
 const CURS=["PLN","EUR","USD","GBP","CHF","CZK","SEK","NOK","DKK","HUF","CAD","AUD","JPY"];
 let pid="all",txEdit=null;
 const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
-const pct=v=>isFinite(v)?`<span class="${v<0?"bad":v>0?"good":""}">${v>=0?"+":""}${(v*100).toFixed(2).replace(".",",")} %</span>`:"–";
-const sg=(v,c)=>`<span class="${v<0?"bad":v>0?"good":""}">${v>0?"+":""}${money(v,c)}</span>`;
+const pct=v=>isFinite(v)?`<span class="nb ${v<0?"bad":v>0?"good":""}">${v>=0?"+":""}${(v*100).toFixed(2).replace(".",",")}&nbsp;%</span>`:"–";
+const sg=(v,c)=>`<span class="nb ${v<0?"bad":v>0?"good":""}">${v>0?"+":""}${money(v,c)}</span>`;
 const fq=n=>String(Math.round(n*1e6)/1e6).replace(".",",");
 const TL={buy:"Zakup",sell:"Sprzedaż",div:"Dywidenda",fee:"Opłata"};
 
@@ -430,7 +457,7 @@ document.addEventListener("change",e=>{
 
 document.addEventListener("click",e=>{
   const t=e.target.closest("[data-bak],[data-bedit],[data-bsave],[data-bcancel],[data-bdel],[data-cpisave],[data-cpidel],[data-ppsave],[data-pesave],[data-peedit],[data-pecancel],[data-pedel]");if(!t)return;const d=t.dataset;
-  if("bak" in d){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:"application/json"}));a.download="portfel-kopia-"+today()+".json";a.click()}
+  if("bak" in d){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,_meta:{app:"portfel",at:new Date().toISOString()}},null,1)],{type:"application/json"}));a.download="portfel-kopia-"+today()+".json";a.click()}
   else if(d.bedit){bEdit=d.bedit;modal="bond";render()}
   else if("bcancel" in d){bEdit=null;render()}
   else if("bdel" in d){if(confirm("Usunąć te obligacje?")){S.bonds=S.bonds.filter(x=>x.id!==bEdit);bEdit=null;save()}}
@@ -487,6 +514,74 @@ document.addEventListener("click",e=>{
 
 document.addEventListener("change",e=>{if(e.target.id==="d-cur"){const cu=e.target.value;$("#d-fxbox").style.display=cu!=="PLN"?"":"none";$("#d-fxl").textContent="Kurs z dnia wpłaty (PLN za 1 "+cu+")"}});
 
+function ccyBreakdown(){const m={},add=(c,v)=>{if(v>0)m[c]=(m[c]||0)+v};
+  for(const a of S.accounts){const r=rates[a.cur];if(r)add(a.cur,a.amount*r)}
+  for(const p of S.pf){const c=calc(p);if(!c.f)continue;for(const x of c.open)if(x.value!=null)add(x.ccy,x.value*c.f)}
+  add("PLN",bondTotals().value);add("PLN",ppkCalc().value);
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])}
+
+let locked=false,lockIn="",lockMsg="",hiddenAt=0;
+const pinCfg=()=>{try{return JSON.parse(localStorage.getItem("pin"))}catch(e){return null}};
+const pinFail=()=>{try{return JSON.parse(localStorage.getItem("pinf"))||{}}catch(e){return {}}};
+const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+async function pinHash(pin,salt){const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(pin),"PBKDF2",false,["deriveBits"]);return b64(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt,iterations:150000},k,256))}
+async function pinCheck(pin,c){return (await pinHash(pin,unb64(c.s)))===c.h}
+function drawLock(){const el=$("#lock");if(!el)return;if(!locked){el.innerHTML="";el.style.display="none";return}
+  const c=pinCfg();if(!c){locked=false;el.style.display="none";return}
+  el.style.display="flex";
+  el.innerHTML=`<div class="lk"><h1>Portfel</h1><p class="mu" style="min-height:22px">${esc(lockMsg||"Wpisz PIN")}</p>
+   <div class="dots">${Array.from({length:c.n},(_,i)=>`<i class="${i<lockIn.length?"f":""}"></i>`).join("")}</div>
+   <div class="kp">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join("")}<button class="sm" data-kf>Nie pamiętam PIN-u</button><button data-k="0">0</button><button data-kb aria-label="Usuń cyfrę">⌫</button></div></div>`}
+function lockNow(){if(!pinCfg())return;locked=true;lockIn="";lockMsg="";drawLock()}
+async function pinKey(d){const c=pinCfg();if(!c||!locked)return;const f=pinFail();
+  if(f.until>Date.now()){lockMsg="Spróbuj za "+Math.ceil((f.until-Date.now())/1000)+" s";drawLock();return}
+  if(lockIn.length>=c.n)return;lockIn+=d;lockMsg="";drawLock();
+  if(lockIn.length===c.n){let ok=false;try{ok=await pinCheck(lockIn,c)}catch(e){}
+    if(ok){locked=false;lockIn="";lockMsg="";localStorage.removeItem("pinf");drawLock();return}
+    const n=(f.c||0)+1;lockIn="";
+    if(n>=10){localStorage.removeItem("pin");localStorage.removeItem("pinf");locked=false;drawLock();signOut(auth);alert("Zbyt wiele błędnych prób. Wylogowano, zaloguj się hasłem konta.");return}
+    localStorage.setItem("pinf",JSON.stringify({c:n,until:n>=5?Date.now()+30000:0}));
+    lockMsg=n>=5?"Błędny PIN. Odczekaj 30 s":"Błędny PIN";drawLock()}}
+function pinForm(){const c=pinCfg();return `<div class="card"><b>${c?"Zmień lub wyłącz PIN":"Ustaw PIN"}</b><p class="mu">PIN działa tylko na tym urządzeniu i blokuje wejście do aplikacji. Dane w chmurze chroni hasło konta.</p>
+   ${c?`<label>Obecny PIN</label><input id="pn-old" type="password" inputmode="numeric" maxlength="6" autocomplete="off">`:""}
+   <label>Nowy PIN (4 do 6 cyfr)</label><input id="pn-new" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+   <label>Powtórz nowy PIN</label><input id="pn-new2" type="password" inputmode="numeric" maxlength="6" autocomplete="off">
+   <button data-pinsave style="width:100%">Zapisz PIN</button>${c?`<p><button class="danger" data-pinoff>Wyłącz PIN</button></p>`:""}</div>`}
+
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-k],[data-kb],[data-kf],[data-pinsave],[data-pinoff]");if(!t)return;const d=t.dataset;
+  if(d.k!==undefined)pinKey(d.k);
+  else if("kb" in d){lockIn=lockIn.slice(0,-1);drawLock()}
+  else if("kf" in d){if(confirm("Zresetuję PIN na tym urządzeniu i wylogujesz się. Potem zalogujesz się hasłem konta. Kontynuować?")){localStorage.removeItem("pin");localStorage.removeItem("pinf");locked=false;drawLock();signOut(auth)}}
+  else if("pinsave" in d||"pinoff" in d){
+    if(!(window.crypto&&crypto.subtle)){alert("Ta przeglądarka nie obsługuje PIN-u (wymaga połączenia https).");return}
+    const c=pinCfg();
+    if(c){let ok=false;try{ok=await pinCheck($("#pn-old").value,c)}catch(x){}if(!ok){alert("Obecny PIN jest błędny.");return}}
+    if("pinoff" in d){localStorage.removeItem("pin");localStorage.removeItem("pinf");modal=null;render();alert("PIN wyłączony.");return}
+    const a=$("#pn-new").value,b=$("#pn-new2").value;
+    if(!/^\d{4,6}$/.test(a)){alert("PIN musi mieć od 4 do 6 cyfr.");return}
+    if(a!==b){alert("PIN-y się różnią.");return}
+    const salt=crypto.getRandomValues(new Uint8Array(16));
+    localStorage.setItem("pin",JSON.stringify({s:b64(salt),h:await pinHash(a,salt),n:a.length}));localStorage.removeItem("pinf");
+    modal=null;render();alert("PIN ustawiony.")}});
+document.addEventListener("keydown",e=>{if(!locked)return;if(/^\d$/.test(e.key))pinKey(e.key);else if(e.key==="Backspace"){lockIn=lockIn.slice(0,-1);drawLock()}});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)hiddenAt=Date.now();else if(pinCfg()&&user&&hiddenAt&&Date.now()-hiddenAt>60000)lockNow()});
+if(pinCfg())lockNow();
+
+const readText=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=()=>rej(r.error);r.readAsText(f)});
+function bakDownload(name){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,_meta:{app:"portfel",at:new Date().toISOString()}},null,1)],{type:"application/json"}));a.download=name;a.click()}
+async function restoreFile(f){if(!f)return;let o;
+  try{o=JSON.parse(await readText(f))}catch(x){alert("To nie jest poprawny plik kopii (JSON).");return}
+  if(!o||typeof o!=="object"||!["accounts","pf","tx","bonds","dep","ppk"].some(k=>k in o)){alert("W pliku nie widzę danych portfela.");return}
+  const A=k=>Array.isArray(o[k])?o[k]:[];
+  const st={accounts:A("accounts"),pf:A("pf"),tx:A("tx"),bonds:A("bonds"),infl:A("infl"),dep:A("dep"),ppk:Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},o.ppk&&typeof o.ppk==="object"?o.ppk:{})};
+  if(!Array.isArray(st.ppk.e))st.ppk.e=[];
+  if(!confirm("Przywrócić dane z pliku? To ZASTĄPI wszystkie obecne dane.\n\nW pliku: konta "+st.accounts.length+", portfele "+st.pf.length+", ruchy "+st.tx.length+", obligacje "+st.bonds.length+", wpłaty do akcji "+st.dep.length+", wpłaty PPK "+st.ppk.e.length+".\n\nPrzed przywróceniem pobiorę kopię obecnych danych."))return;
+  bakDownload("portfel-przed-przywroceniem-"+today()+".json");
+  try{await setDoc(doc(db,"data","state"),st);modal=null;alert("Dane przywrócone.")}catch(x){alert("Nie udało się zapisać danych: "+(x.code||x.message))}}
+document.addEventListener("change",e=>{if(e.target.id==="rs-file"){const f=e.target.files[0];e.target.value="";restoreFile(f)}});
+
 function viewSoon(n){return `<div class="card"><b>${n}</b><p class="mu">Ten dział dodamy w następnym kroku.</p></div>`}
 
 function render(){const app=$("#app");
@@ -517,7 +612,7 @@ document.addEventListener("click",e=>{
     const rec={id:editId||String(Date.now()),name,owner:$("#f-owner").value,cur,amount};
     S.accounts=editId?S.accounts.map(x=>x.id===editId?rec:x):[...S.accounts,rec];editId=null;save()}});
 
-onAuthStateChanged(auth,u=>{user=u;booted=true;
+onAuthStateChanged(auth,u=>{user=u;booted=true;if(!u&&locked){locked=false;drawLock()}
   if(unsub){unsub();unsub=null}
   if(u){
     unsub=onSnapshot(doc(db,"data","state"),s=>{S=s.exists()?s.data():{accounts:[]};S.accounts=S.accounts||[];S.pf=S.pf||[];S.tx=S.tx||[];S.bonds=S.bonds||[];S.dep=S.dep||[];S.infl=S.infl||[];S.ppk=Object.assign({price:0,pdate:"",fund:"",first:"",override:false,e:[]},S.ppk||{});const ow=o=>o==="Kuba"?"Jakub":o==="Żona"?"Beata":o;[S.accounts,S.pf,S.bonds].forEach(a=>a.forEach(x=>x.owner=ow(x.owner)));if(S.bonds.some(b=>!b.cap&&!b.paid)){S.bonds.forEach(b=>{if(!b.cap&&!b.paid)b.paid=dd(lastPast(b))});save()}err="";render()},
